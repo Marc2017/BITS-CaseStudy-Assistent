@@ -62,6 +62,28 @@ eine Filterung `stufe <= ziel.stufe` mit Zeichenketten würde interne Fakten auf
 die Website lassen. Diese Zahl ist in `fakten.ts` definiert und wird nirgends
 nachgebaut.
 
+### I-07 — `schema.sql` und die Migrationen müssen beide auf jeder Datenbank laufen
+
+`datenbank()` führt **erst** `schema.sql` aus, **dann** die Migrationen. Daraus
+folgt: In `schema.sql` darf keine Anweisung stehen, die auf einer alten
+Datenbank scheitert.
+
+Gemessen am 17.09.2026: Ein `CREATE INDEX IF NOT EXISTS … (fertig, id)` in
+`schema.sql` brach den Start mit `no such column: fertig` ab — den Index gab es
+nicht, also wurde er angelegt, und die Spalte kam erst mit Migration 3.
+`IF NOT EXISTS` schützt vor dem zweiten Anlegen, nicht vor einer fehlenden
+Spalte.
+
+Zwei Konsequenzen, beide umgesetzt:
+
+1. Ein Index auf eine per Migration ergänzte Spalte steht **nur** in der
+   Migration.
+2. Die Migrationen laufen **auch auf einer frischen Datenbank** — jeder
+   Schritt ist idempotent (`IF NOT EXISTS`, `hatSpalte()`). Nur so haben neue
+   und alte Datenbanken garantiert dasselbe Schema. Vorher übersprang
+   `migrieren()` alle Schritte, wenn `user_version = 0` war; damit hing die
+   Gleichheit beider Wege daran, dass jemand beide Dateien gleich pflegt.
+
 ### I-06 — Ohne Fakten wird nicht formuliert
 
 Eine Formulierung mit leerem oder fast leerem Faktenbestand wird abgewiesen,
@@ -159,7 +181,23 @@ merkt sich eine Änderung von Hand (I-02), `fakten_stand` die Anzahl Fakten zum
 Zeitpunkt der Erzeugung — daraus entsteht der Hinweis „seit der Formulierung
 sind 4 Fakten dazugekommen".
 
-### `fassung_sicherung` — die vorige Version, wenn neu formuliert wird (I-02)
+### `fassung_sicherung` — abgelegte Fassungen
+
+Zwei Arten in einer Tabelle: die **automatische Sicherung** vor dem Ersetzen
+(I-02) und die **benannte Version** von Hand (E-17).
+
+| Spalte | Bemerkung |
+|---|---|
+| `inhalt`, `titel`, `handisch` | der abgelegte Stand |
+| `grund` | warum sie entstand („ersetzt", „von Hand abgelegt") |
+| `name` | von Hand gegeben; leer = automatische Sicherung |
+| `kommentar` | was an diesem Stand besonders ist |
+| `fertig` | 1 = fertige Fassung, im Verlauf filterbar |
+| `stufe` | die Grenze des Ziels **zum Zeitpunkt des Ablegens** |
+
+`stufe` wird mitgeschrieben und nicht nachgeschlagen: Ändert jemand später die
+Grenze des Ziels, würde eine alte Fassung sonst eine Freigabe behaupten, die
+sie nie hatte.
 
 ### `lernnotiz` — Beobachtungen im Lernmodus (E-07)
 
@@ -185,6 +223,7 @@ Schlüsselspeicher.
 |---|---|---|
 | — | `schema.sql` legt Version 1 an (Erstausstattung) | 17.09.2026 |
 | M-2 | Tabelle `kunde`, Spalte `story.kunde_id`, `lernnotiz.bezug` um `kunde` erweitert; die Projektart „Projekt bei MAN" entfernt und ihr Wissen als Kunde „MAN" übernommen (E-14) | 17.09.2026 |
+| M-3 | `fassung_sicherung` um `name`, `kommentar`, `fertig` und `stufe` erweitert (E-17) | 17.09.2026 |
 
 Zu M-2 zwei Anmerkungen, die beim nächsten Mal Zeit sparen:
 

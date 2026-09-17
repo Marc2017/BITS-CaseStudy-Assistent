@@ -169,7 +169,10 @@ export function katalog(): Katalogeintrag[] {
 export interface Fortschritt {
   pflicht: number;
   pflichtErfuellt: number;
+  /** Anzahl Fakten. */
   gesamt: number;
+  /** Anzahl verschiedener Faktenarten - nicht dasselbe wie `gesamt`. */
+  arten: number;
   offen: { schluessel: string; label: string; hinweis: string | null }[];
 }
 
@@ -179,13 +182,18 @@ export interface Fortschritt {
  */
 export function fortschritt(storyId: number): Fortschritt {
   const k = katalog();
-  const vorhanden = new Set(fakten(storyId).map((f) => f.schluessel));
+  const bestand = fakten(storyId);
+  const vorhanden = new Set(bestand.map((f) => f.schluessel));
   const pflicht = k.filter((e) => e.pflicht === 1);
   const offen = pflicht.filter((e) => !vorhanden.has(e.schluessel));
   return {
     pflicht: pflicht.length,
     pflichtErfuellt: pflicht.length - offen.length,
-    gesamt: vorhanden.size,
+    // `gesamt` ist die Anzahl FAKTEN, nicht die der Faktenarten. Beide Zahlen
+    // standen einmal unter demselben Namen: Die Spur meldete „26 gesamt",
+    // waehrend der Reiter „Fakten 76" zeigte - fuer denselben Bestand.
+    gesamt: bestand.length,
+    arten: vorhanden.size,
     offen: offen.map((e) => ({ schluessel: e.schluessel, label: e.label, hinweis: e.hinweis })),
   };
 }

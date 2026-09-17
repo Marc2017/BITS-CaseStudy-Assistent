@@ -152,3 +152,31 @@ Kundendatensatz um, statt gelöscht zu werden.
 ist dokumentiert, weil er zählt: Zerlegen erfindet nichts, Vorschlagen rät —
 und markiert deshalb jede geratene Angabe in eckigen Klammern, listet sie
 zusätzlich im Klartext und landet im Eingabefeld statt im Gespräch.
+
+### Benannte Versionen (E-17, Migration M-3)
+
+„Version speichern" legt den aktuellen Stand unter einem Namen ab, mit
+Kommentar und einem Haken „Fertige Fassung". Der Verlauf filtert darauf und
+zeigt die Vertraulichkeitsstufe als eigene Spalte. Gemessen: abgelegt,
+gefiltert (1 von 1 fertig), Stufe `oeffentlich` korrekt mitgeschrieben.
+
+### F-02 — `schema.sql` brach den Start ab: „no such column: fertig"
+
+Der Index auf die neue Spalte `fertig` stand in `schema.sql`, und diese Datei
+läuft **vor** den Migrationen. Auf einer Datenbank von Stand 2 gab es die
+Spalte noch nicht: `CREATE INDEX IF NOT EXISTS` fand keinen Index, legte ihn
+an — und scheiterte an der fehlenden Spalte. `IF NOT EXISTS` schützt vor dem
+zweiten Anlegen, nicht vor einer fehlenden Spalte.
+
+Zwei Änderungen, beide in `I-07` festgehalten: Indizes auf per Migration
+ergänzte Spalten stehen nur noch in der Migration, und die Migrationen laufen
+jetzt **auch auf einer frischen Datenbank** (jeder Schritt ist idempotent).
+Vorher hing die Gleichheit beider Wege daran, dass jemand zwei Dateien gleich
+pflegt — das ist keine Garantie, sondern eine Hoffnung.
+
+### F-03 — Zwei verschiedene Zahlen unter demselben Namen
+
+Die Faktenspur meldete „26 gesamt", während der Reiter „Fakten 76" zeigte —
+für denselben Bestand. `fortschritt.gesamt` zählte die verschiedenen
+Faktenarten, nicht die Fakten. Jetzt sind es zwei Felder (`gesamt`, `arten`),
+und die Spur sagt „76 Fakten in 26 Rubriken".

@@ -50,6 +50,7 @@ fuegeStrom('POST', '/api/storys/:id/fassung',           r.fassungFormulieren);
 fuege('PUT',    '/api/storys/:id/fassung/:ziel',     r.fassungHand);
 fuege('GET',    '/api/storys/:id/fassung/:ziel/verlauf', r.fassungVerlauf);
 fuege('POST',   '/api/storys/:id/fassung/:ziel/zurueck', r.fassungZurueck);
+fuege('POST',   '/api/storys/:id/fassung/:ziel/version', r.versionSpeichern);
 
 fuegeStrom('POST', '/api/import',                       r.importieren_);
 fuegeStrom('POST', '/api/text/umformulieren',           r.umformulieren);

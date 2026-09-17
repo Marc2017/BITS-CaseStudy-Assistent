@@ -43,6 +43,9 @@ Links die Entwicklung, rechts das Ergebnis:
   ist mit einem Klick änderbar. Darunter steht, was noch fehlt.
 - **Erfolgsgeschichte** — die Fassung zum gewählten Ziel, als Blatt im
   WYSIWYG-Editor. Handgeschriebenes wird nie stillschweigend überschrieben.
+  **„Version speichern"** legt einen Stand unter einem Namen ab, mit Kommentar
+  und dem Haken „Fertige Fassung"; im Verlauf lässt sich darauf filtern, und
+  die Vertraulichkeitsstufe steht daneben.
 
 Während die KI arbeitet, zeigt die Oberfläche, was sie tut: Arbeitsschritt,
 verstrichene Zeit und die Zwischenüberlegungen des Modells.

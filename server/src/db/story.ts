@@ -195,16 +195,62 @@ export function fassungSpeichern(e: {
   return id;
 }
 
-export function sicherungen(fassungId: number) {
-  return alle(
-    `SELECT id, titel, handisch, grund, erstellt_am, length(inhalt) AS zeichen
-       FROM fassung_sicherung WHERE fassung_id = ? ORDER BY id DESC`,
+export interface SicherungZeile {
+  id: number;
+  titel: string | null;
+  name: string | null;
+  kommentar: string | null;
+  fertig: number;
+  stufe: string | null;
+  handisch: number;
+  grund: string | null;
+  erstellt_am: string;
+  zeichen: number;
+}
+
+/** Abgelegte Fassungen; `nurFertige` filtert auf die benannten Endfassungen. */
+export function sicherungen(fassungId: number, nurFertige = false): SicherungZeile[] {
+  return alle<SicherungZeile>(
+    `SELECT id, titel, name, kommentar, fertig, stufe, handisch, grund, erstellt_am,
+            length(inhalt) AS zeichen
+       FROM fassung_sicherung
+      WHERE fassung_id = ? ${nurFertige ? 'AND fertig = 1' : ''}
+      ORDER BY id DESC`,
     fassungId,
   );
 }
 
+/**
+ * Den aktuellen Stand als benannte Version ablegen (E-17).
+ *
+ * Anders als die automatische Sicherung ist das eine Entscheidung: Jemand
+ * sagt, dass dieser Stand einen Namen verdient. Die Stufe wird mitgeschrieben
+ * und nicht nachgeschlagen - wird die Grenze des Ziels spaeter geaendert,
+ * muss an der Version stehen, unter welcher Grenze sie entstanden ist.
+ */
+export function versionAblegen(e: {
+  storyId: number;
+  zielId: number;
+  name: string;
+  kommentar?: string | null;
+  fertig: boolean;
+  stufe: string | null;
+}): { id: number } {
+  const f = fassung(e.storyId, e.zielId);
+  if (!f) throw new Error('Fuer dieses Ziel gibt es noch keine Fassung.');
+  if (!f.inhalt.trim()) throw new Error('Die Fassung ist leer - da ist nichts abzulegen.');
+  const { id } = schreib(
+    `INSERT INTO fassung_sicherung
+       (fassung_id, titel, inhalt, handisch, grund, name, kommentar, fertig, stufe)
+     VALUES (?,?,?,?,?,?,?,?,?)`,
+    f.id, f.titel, f.inhalt, f.handisch, 'von Hand abgelegt',
+    e.name.trim(), e.kommentar?.trim() || null, e.fertig ? 1 : 0, e.stufe,
+  );
+  return { id };
+}
+
 export function sicherung(id: number) {
-  return eine<{ id: number; inhalt: string; titel: string | null }>(
-    'SELECT id, titel, inhalt FROM fassung_sicherung WHERE id = ?', id,
+  return eine<{ id: number; inhalt: string; titel: string | null; name: string | null }>(
+    'SELECT id, titel, inhalt, name FROM fassung_sicherung WHERE id = ?', id,
   );
 }

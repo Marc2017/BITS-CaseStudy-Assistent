@@ -33,7 +33,10 @@ export interface Nachricht {
 export interface Fortschritt {
   pflicht: number;
   pflichtErfuellt: number;
+  /** Anzahl Fakten. */
   gesamt: number;
+  /** Anzahl verschiedener Faktenarten. */
+  arten: number;
   offen: { schluessel: string; label: string; hinweis: string | null }[];
 }
 
@@ -59,6 +62,20 @@ export interface Projektart {
   lernmodus: number;
   sort: number;
   aktiv: number;
+}
+
+/** Eine abgelegte Fassung: automatisch gesichert oder von Hand benannt. */
+export interface Sicherung {
+  id: number;
+  titel: string | null;
+  name: string | null;
+  kommentar: string | null;
+  fertig: number;
+  stufe: Stufe | null;
+  handisch: number;
+  grund: string | null;
+  erstellt_am: string;
+  zeichen: number;
 }
 
 export interface Kunde {
@@ -248,10 +265,16 @@ export const api = {
     }>(`/storys/${id}/fassung`, { ziel_id: zielId }, fortgang),
   fassungSpeichern: (id: number, zielId: number, e: { titel?: string | null; inhalt: string }) =>
     ruf<{ fassung: FassungZeile }>(`/storys/${id}/fassung/${zielId}`, 'PUT', e),
-  fassungVerlauf: (id: number, zielId: number) =>
-    ruf<{ fassung_id?: number; sicherungen: { id: number; grund: string; erstellt_am: string; zeichen: number; handisch: number }[] }>(
-      `/storys/${id}/fassung/${zielId}/verlauf`,
+  fassungVerlauf: (id: number, zielId: number, nurFertige = false) =>
+    ruf<{ fassung_id?: number; sicherungen: Sicherung[] }>(
+      `/storys/${id}/fassung/${zielId}/verlauf${nurFertige ? '?fertig=1' : ''}`,
     ),
+  versionSpeichern: (
+    id: number, zielId: number,
+    e: { name: string; kommentar?: string | null; fertig: boolean },
+  ) => ruf<{ id: number; sicherungen: Sicherung[] }>(
+    `/storys/${id}/fassung/${zielId}/version`, 'POST', e,
+  ),
   fassungZurueck: (id: number, zielId: number, sicherungId: number) =>
     ruf<{ fassung: FassungZeile }>(
       `/storys/${id}/fassung/${zielId}/zurueck`, 'POST', { sicherung_id: sicherungId },

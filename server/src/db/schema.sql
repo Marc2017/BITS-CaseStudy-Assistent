@@ -143,7 +143,8 @@ CREATE TABLE IF NOT EXISTS fassung (
   UNIQUE (story_id, ziel_id)
 );
 
--- Die vorige Version, bevor neu formuliert wird (I-02).
+-- Abgelegte Fassungen: automatisch vor dem Ersetzen (I-02) oder von Hand als
+-- benannte Version (E-17). `name` und `fertig` unterscheiden die beiden.
 CREATE TABLE IF NOT EXISTS fassung_sicherung (
   id          INTEGER PRIMARY KEY,
   fassung_id  INTEGER NOT NULL REFERENCES fassung(id) ON DELETE CASCADE,
@@ -151,9 +152,17 @@ CREATE TABLE IF NOT EXISTS fassung_sicherung (
   inhalt      TEXT NOT NULL,
   handisch    INTEGER NOT NULL DEFAULT 0,
   grund       TEXT,
+  name        TEXT,          -- von Hand gegeben; leer = automatische Sicherung
+  kommentar   TEXT,
+  fertig      INTEGER NOT NULL DEFAULT 0,
+  stufe       TEXT,          -- Grenze des Ziels zum Zeitpunkt des Ablegens
   erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS sicherung_fassung ON fassung_sicherung(fassung_id, id);
+-- Der Index auf `fertig` steht NICHT hier, sondern nur in Migration 3: Diese
+-- Datei laeuft VOR den Migrationen, und auf einer Datenbank von Stand 1 gibt
+-- es die Spalte noch nicht - der Index scheiterte mit "no such column"
+-- (siehe I-07 in docs/02-datenmodell.md).
 
 -- ----------------------------------------------------------------- Lernmodus
 -- Vorschlaege, keine stille Selbstveraenderung (E-07).

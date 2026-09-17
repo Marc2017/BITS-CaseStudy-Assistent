@@ -251,3 +251,28 @@ Zwei Dinge, die dabei nicht selbstverständlich sind:
 
 Ohne Melder läuft alles unverändert, nur stumm (`STILL`): Tests und künftige
 Batchläufe müssen nichts davon wissen.
+
+## E-17 — Benannte Versionen einer Fassung
+
+*17.09.2026 — auf Wunsch von Marc*
+
+Bisher entstand eine abgelegte Fassung nur als **Nebenprodukt**: Sie wurde
+gesichert, weil etwas sie ersetzte (I-02). Was fehlte, war das Gegenteil —
+jemand entscheidet, dass *dieser* Stand einen Namen verdient: „Website-Fassung
+v1, nach Freigabe durch den Kunden".
+
+Der Knopf „Version speichern" fragt nach Name, Kommentar und einem Haken
+**„Fertige Fassung"**. Im Verlauf lässt sich darauf filtern, und die
+Vertraulichkeitsstufe steht als eigene Spalte daneben.
+
+Beides liegt in derselben Tabelle (`fassung_sicherung`), weil beides eine
+abgelegte Fassung ist; `name` und `fertig` unterscheiden sie. Eine zweite
+Tabelle hätte dieselben Spalten, dieselbe Zurückhol-Logik und eine zweite
+Stelle, die man beim Zurückholen vergisst.
+
+**Die Stufe wird mitgeschrieben, nicht nachgeschlagen.** Wird die Grenze eines
+Ziels später geändert, muss an der Version stehen, unter welcher Grenze sie
+entstanden ist — sonst behauptet eine alte Fassung eine Freigabe, die sie nie
+hatte. Aus demselben Grund ist die Stufe im Dialog sichtbar, aber **nicht
+eingebbar**: Eine Fassung, die aus öffentlichen Fakten entstanden ist, wird
+nicht dadurch intern, dass jemand es behauptet (I-04).

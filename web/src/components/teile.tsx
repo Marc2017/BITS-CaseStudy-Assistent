@@ -26,7 +26,8 @@ export function Spur({ stand, neu = 0 }: { stand: Fortschritt; neu?: number }) {
     <div className="spur" title={titel}>
       <div className="marken">{marken}</div>
       <span className="zahl">
-        {voll}/{stand.pflicht} Pflichtfakten · {stand.gesamt} gesamt
+        {voll}/{stand.pflicht} Pflichtfakten · {stand.gesamt} Fakten in{' '}
+        {stand.arten} Rubriken
       </span>
     </div>
   );

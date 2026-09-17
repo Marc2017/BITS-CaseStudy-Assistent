@@ -8,6 +8,7 @@ import {
 import {
   fassung, fassungen, fassungSpeichern, nachrichtAnlegen, sicherung, sicherungen,
   story, storyAendern, storyAnlegen, storyLoeschen, storys, verlauf,
+  versionAblegen,
 } from '../db/story.ts';
 import {
   kunde, kunden, kundeSpeichern, projektarten, projektartSpeichern, struktur,
@@ -309,7 +310,28 @@ export function fassungHand(k: Kontext) {
 export function fassungVerlauf(k: Kontext) {
   const f = fassung(nr(k, 'id'), nr(k, 'ziel'));
   if (!f) return { sicherungen: [] };
-  return { fassung_id: f.id, sicherungen: sicherungen(f.id) };
+  const nurFertige = k.query.get('fertig') === '1';
+  return { fassung_id: f.id, sicherungen: sicherungen(f.id, nurFertige) };
+}
+
+/** Den aktuellen Stand als benannte Version ablegen (E-17). */
+export function versionSpeichern(k: Kontext) {
+  const id = nr(k, 'id');
+  const zielId = nr(k, 'ziel');
+  const z = ziel(zielId);
+  if (!z) throw new Fehlerhaft('Ziel unbekannt.');
+  const r = versionAblegen({
+    storyId: id,
+    zielId,
+    name: pflicht(k, 'name'),
+    kommentar: text(k, 'kommentar') ?? null,
+    fertig: Boolean(k.body.fertig),
+    // Die Stufe kommt vom Ziel, nicht aus dem Antragskoerper: Sie ist eine
+    // Eigenschaft der Vorlage und darf nicht von der Oberflaeche gesetzt
+    // werden (I-04).
+    stufe: (text(k, 'stufe') as Stufe | undefined) ?? z.stufe,
+  });
+  return { ...r, sicherungen: sicherungen(fassung(id, zielId)!.id) };
 }
 
 export function fassungZurueck(k: Kontext) {

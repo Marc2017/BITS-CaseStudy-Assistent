@@ -12,6 +12,12 @@ interface Schritt {
   ausfuehren: (db: DatabaseSync) => void;
 }
 
+/** Hat eine Tabelle diese Spalte schon? */
+function hatSpalte(db: DatabaseSync, tabelle: string, spalte: string): boolean {
+  const spalten = db.prepare(`PRAGMA table_info(${tabelle})`).all() as { name: string }[];
+  return spalten.some((s) => s.name === spalte);
+}
+
 // Version 1 ist die Erstausstattung aus schema.sql. Der erste echte Schritt
 // bekommt Version 2.
 const SCHRITTE: Schritt[] = [
@@ -38,12 +44,14 @@ const SCHRITTE: Schritt[] = [
 
       // Zuordnung an der Geschichte. Steuergroesse wie projektart_id, kein
       // Inhalt - der Kundenname als Inhalt bleibt ein Fakt (I-03).
-      const spalten = db.prepare('PRAGMA table_info(story)').all() as { name: string }[];
-      if (!spalten.some((s) => s.name === 'kunde_id')) {
-        db.exec('ALTER TABLE story ADD COLUMN kunde_id INTEGER REFERENCES kunde(id) ON DELETE SET NULL');
+      if (!hatSpalte(db, 'story', 'kunde_id')) {
+        db.exec(
+          'ALTER TABLE story ADD COLUMN kunde_id INTEGER '
+          + 'REFERENCES kunde(id) ON DELETE SET NULL',
+        );
       }
 
-      // Lernnotizen koennen sich jetzt auch auf einen Kunden beziehen. Der
+      // Lernnotizen koennen sich jetzt auch auf einen Kunden beziehen. Ein
       // CHECK laesst sich in SQLite nicht aendern, also wird die Tabelle neu
       // gebaut - mit den vorhandenen Notizen.
       db.exec(`
@@ -59,18 +67,21 @@ const SCHRITTE: Schritt[] = [
                       CHECK (status IN ('offen','uebernommen','verworfen')),
           erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
         );
-        INSERT INTO lernnotiz_neu (id, bezug, bezug_id, text, begruendung, story_id, status, erstellt_am)
-          SELECT id, bezug, bezug_id, text, begruendung, story_id, status, erstellt_am FROM lernnotiz;
+        INSERT INTO lernnotiz_neu
+            (id, bezug, bezug_id, text, begruendung, story_id, status, erstellt_am)
+          SELECT id, bezug, bezug_id, text, begruendung, story_id, status, erstellt_am
+            FROM lernnotiz;
         DROP TABLE lernnotiz;
         ALTER TABLE lernnotiz_neu RENAME TO lernnotiz;
         CREATE INDEX IF NOT EXISTS lernnotiz_status ON lernnotiz(status, bezug);
       `);
 
       // Die Projektart „Projekt bei MAN" war ein Platzhalter fuer genau das,
-      // was jetzt der Kunde traegt. Ihr Wissen zieht mit um, statt verloren
-      // zu gehen; Geschichten, die auf ihr hingen, verlieren nur die
-      // Zuordnung (ON DELETE SET NULL).
-      const man = db.prepare("SELECT id, hinweise FROM projektart WHERE name = 'Projekt bei MAN'")
+      // was jetzt der Kunde traegt. Ihr Wissen zieht mit um, statt verloren zu
+      // gehen; Geschichten, die auf ihr hingen, verlieren nur die Zuordnung
+      // (ON DELETE SET NULL).
+      const man = db
+        .prepare("SELECT id, hinweise FROM projektart WHERE name = 'Projekt bei MAN'")
         .get() as { id: number; hinweise: string | null } | undefined;
       if (man) {
         db.prepare(
@@ -80,6 +91,36 @@ const SCHRITTE: Schritt[] = [
         ).run('MAN', 'Automotive & Zulieferer', man.hinweise ?? '');
         db.prepare('DELETE FROM projektart WHERE id = ?').run(man.id);
       }
+    },
+  },
+
+  {
+    version: 3,
+    name: 'Benannte Versionen einer Fassung',
+    ausfuehren(db) {
+      // Eine Sicherung war bisher ein Nebenprodukt: Sie entstand, weil etwas
+      // ersetzt wurde. Eine benannte Version ist das Gegenteil - jemand
+      // entscheidet, dass DIESER Stand einen Namen verdient (E-17). Beides
+      // liegt in derselben Tabelle, weil beides eine abgelegte Fassung ist;
+      // `name` und `fertig` unterscheiden sie.
+      if (!hatSpalte(db, 'fassung_sicherung', 'name')) {
+        db.exec('ALTER TABLE fassung_sicherung ADD COLUMN name TEXT');
+      }
+      if (!hatSpalte(db, 'fassung_sicherung', 'kommentar')) {
+        db.exec('ALTER TABLE fassung_sicherung ADD COLUMN kommentar TEXT');
+      }
+      if (!hatSpalte(db, 'fassung_sicherung', 'fertig')) {
+        db.exec('ALTER TABLE fassung_sicherung ADD COLUMN fertig INTEGER NOT NULL DEFAULT 0');
+      }
+      // Die Vertraulichkeitsstufe des Ziels zum Zeitpunkt des Ablegens. Sie
+      // wird MITGESCHRIEBEN und nicht nachgeschlagen: Wird die Grenze eines
+      // Ziels spaeter geaendert, muss an der Version stehen, unter welcher
+      // Grenze sie entstanden ist - sonst behauptet eine alte Fassung eine
+      // Freigabe, die sie nie hatte.
+      if (!hatSpalte(db, 'fassung_sicherung', 'stufe')) {
+        db.exec('ALTER TABLE fassung_sicherung ADD COLUMN stufe TEXT');
+      }
+      db.exec('CREATE INDEX IF NOT EXISTS sicherung_fertig ON fassung_sicherung(fertig, id)');
     },
   },
 ];
@@ -98,8 +139,13 @@ export function migrieren(db: DatabaseSync): Ergebnis {
   const start = von === 0 ? 1 : von;
   const gelaufen: string[] = [];
 
+  // Auch auf einer frischen Datenbank laufen ALLE Schritte (I-07). Jeder ist
+  // idempotent - `IF NOT EXISTS` und `hatSpalte()` - und nur so bekommen neue
+  // und alte Datenbanken garantiert dasselbe Schema. Wer hier wieder eine
+  // Abkuerzung einbaut, laesst die beiden auseinanderlaufen; genau das hat
+  // schon einmal einen Start mit "no such column: fertig" abgebrochen.
   for (const s of SCHRITTE) {
-    if (s.version <= start) continue;
+    if (von !== 0 && s.version <= start) continue;
     db.exec('BEGIN');
     try {
       s.ausfuehren(db);
@@ -113,6 +159,8 @@ export function migrieren(db: DatabaseSync): Ergebnis {
   }
 
   const ziel = SCHRITTE.length ? Math.max(start, ...SCHRITTE.map((s) => s.version)) : start;
-  if (von === 0) db.exec(`PRAGMA user_version = ${ziel}`);
-  return { von: start, nach: ziel, schritte: gelaufen };
+  db.exec(`PRAGMA user_version = ${ziel}`);
+  // Auf einer frischen Datenbank sind die Schritte gelaufen, aber es gab
+  // nichts zu melden - das ist kein Migrationsereignis.
+  return { von: start, nach: ziel, schritte: von === 0 ? [] : gelaufen };
 }

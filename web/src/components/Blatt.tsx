@@ -6,7 +6,8 @@
 // bei jeder Eingabe an den Anfang.
 import { useEffect, useRef, useState } from 'react';
 import {
-  api, datum, stufenName, type FassungZeile, type Fortschritt, type ZielMitFreigabe,
+  api, datum, stufenName, type FassungZeile, type Fortschritt, type Sicherung,
+  type ZielMitFreigabe,
 } from '../lib/api.ts';
 import {
   Arbeitsanzeige, Denkt, Fehlerbalken, Kasten, useFortgang,
@@ -53,7 +54,7 @@ export function Blatt(
   const [formuliert, setFormuliert] = useState(false);
   const [luecken, setLuecken] = useState<string[]>([]);
   const [meldung, setMeldung] = useState<string | null>(null);
-  const [frage, setFrage] = useState<null | 'ueberschreiben' | 'verlauf'>(null);
+  const [frage, setFrage] = useState<null | 'ueberschreiben' | 'verlauf' | 'ablegen'>(null);
   const [stempel, setStempel] = useState(0);
   const [umLaeuft, setUmLaeuft] = useState(false);
   const { stand: fortgangStand, fortgang, zuruecksetzen } = useFortgang();
@@ -194,9 +195,19 @@ export function Blatt(
         )}
         <div className="rechts">
           {fassung?.inhalt && (
-            <button type="button" className="knopf leise" onClick={() => setFrage('verlauf')}>
-              Verlauf
-            </button>
+            <>
+              <button
+                type="button"
+                className="knopf leise"
+                onClick={() => setFrage('ablegen')}
+                title="Diesen Stand unter einem Namen ablegen"
+              >
+                Version speichern
+              </button>
+              <button type="button" className="knopf leise" onClick={() => setFrage('verlauf')}>
+                Verlauf
+              </button>
+            </>
           )}
           <button
             type="button"
@@ -370,6 +381,22 @@ export function Blatt(
         />
       )}
 
+      {frage === 'ablegen' && zielId && ziel && (
+        <AblegenKasten
+          storyId={storyId}
+          zielId={zielId}
+          zielName={ziel.name}
+          stufe={ziel.stufe}
+          vorschlag={fassung?.titel ?? arbeitstitel}
+          zu={() => setFrage(null)}
+          fertig={(name) => {
+            setMeldung(`Als Version „${name}" abgelegt.`);
+            setFrage(null);
+          }}
+          fehler={fehler}
+        />
+      )}
+
       {frage === 'verlauf' && zielId && (
         <VerlaufKasten
           storyId={storyId}
@@ -395,44 +422,92 @@ function VerlaufKasten(
     zurueck: (id: number) => Promise<void>; fehler: (t: string) => void;
   },
 ) {
-  const [zeilen, setZeilen] = useState<
-    { id: number; grund: string; erstellt_am: string; zeichen: number; handisch: number }[] | null
-  >(null);
+  const [zeilen, setZeilen] = useState<Sicherung[] | null>(null);
+  const [nurFertige, setNurFertige] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
   useEffect(() => {
-    api.fassungVerlauf(storyId, zielId)
+    setZeilen(null);
+    api.fassungVerlauf(storyId, zielId, nurFertige)
       .then((r) => setZeilen(r.sicherungen))
       .catch((e) => setProblem(e instanceof Error ? e.message : String(e)));
-  }, [storyId, zielId]);
+  }, [storyId, zielId, nurFertige]);
 
   return (
     <Kasten
-      titel="Frühere Versionen"
+      titel="Abgelegte Fassungen"
       zu={zu}
+      breit
       kinder={(
         <>
           <Fehlerbalken text={problem} />
-          <p className="hinweis" style={{ marginBottom: 12 }}>
-            Jedes Mal, wenn eine Fassung ersetzt wurde, ist die vorige hier abgelegt.
-          </p>
+          <div
+            style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              justifyContent: 'space-between', marginBottom: 12,
+            }}
+          >
+            <p className="hinweis" style={{ margin: 0, maxWidth: '60ch' }}>
+              Hier liegen die Stände, die von Hand als Version abgelegt wurden — und
+              jede Fassung, die beim Neuformulieren ersetzt wurde.
+            </p>
+            <label className="schalter" style={{ whiteSpace: 'nowrap' }}>
+              <input
+                type="checkbox"
+                checked={nurFertige}
+                onChange={(e) => setNurFertige(e.target.checked)}
+              />
+              nur fertige Fassungen
+            </label>
+          </div>
+
           {zeilen === null && <Denkt text="lädt …" />}
           {zeilen?.length === 0 && (
-            <div className="leer">Noch keine früheren Versionen.</div>
+            <div className="leer">
+              {nurFertige
+                ? 'Keine als fertig markierte Fassung. Der Haken wird beim Ablegen gesetzt.'
+                : 'Noch keine abgelegten Fassungen.'}
+            </div>
           )}
           {zeilen && zeilen.length > 0 && (
             <table className="tab">
               <thead>
-                <tr><th>Wann</th><th>Grund</th><th>Umfang</th><th /></tr>
+                <tr>
+                  <th>Version</th>
+                  <th>Typ</th>
+                  <th>Wann</th>
+                  <th>Umfang</th>
+                  <th />
+                </tr>
               </thead>
               <tbody>
                 {zeilen.map((z) => (
                   <tr key={z.id}>
-                    <td className="neben">{datum(z.erstellt_am)}</td>
-                    <td className="neben">
-                      {z.grund}{z.handisch ? ' (von Hand)' : ''}
+                    <td>
+                      <div className="haupt">
+                        {z.fertig === 1 && (
+                          <span
+                            className="grenze stufe oeffentlich"
+                            style={{ marginRight: 7 }}
+                            title="als fertige Fassung markiert"
+                          >
+                            fertig
+                          </span>
+                        )}
+                        {z.name || <span className="neben">automatisch gesichert</span>}
+                      </div>
+                      <div className="neben">
+                        {z.kommentar || z.grund}
+                        {z.handisch === 1 ? ' · von Hand bearbeitet' : ''}
+                      </div>
                     </td>
-                    <td className="neben">{z.zeichen} Zeichen</td>
+                    <td>
+                      {z.stufe
+                        ? <span className={`grenze stufe ${z.stufe}`}>{stufenName(z.stufe)}</span>
+                        : <span className="neben">—</span>}
+                    </td>
+                    <td className="neben">{datum(z.erstellt_am)}</td>
+                    <td className="neben">{z.zeichen.toLocaleString('de-DE')} Zeichen</td>
                     <td className="rechts">
                       <button
                         type="button"
@@ -447,6 +522,124 @@ function VerlaufKasten(
               </tbody>
             </table>
           )}
+        </>
+      )}
+    />
+  );
+}
+
+/**
+ * Einen Stand als benannte Version ablegen (E-17).
+ *
+ * Der Typ wird angezeigt, aber nicht zur Eingabe gestellt: Er ist die
+ * Vertraulichkeitsgrenze des Ziels und wird beim Ablegen mitgeschrieben. Sie
+ * hier ändern zu lassen, hiesse eine Freigabe zu behaupten, die die Fassung
+ * nicht hat (I-04).
+ */
+function AblegenKasten(
+  { storyId, zielId, zielName, stufe, vorschlag, zu, fertig, fehler }:
+  {
+    storyId: number;
+    zielId: number;
+    zielName: string;
+    stufe: Sicherung['stufe'];
+    vorschlag: string;
+    zu: () => void;
+    fertig: (name: string) => void;
+    fehler: (t: string) => void;
+  },
+) {
+  const [name, setName] = useState(vorschlag);
+  const [kommentar, setKommentar] = useState('');
+  const [istFertig, setIstFertig] = useState(false);
+  const [laeuft, setLaeuft] = useState(false);
+
+  const ablegen = async () => {
+    if (!name.trim()) return;
+    setLaeuft(true);
+    try {
+      await api.versionSpeichern(storyId, zielId, {
+        name: name.trim(),
+        kommentar: kommentar.trim() || null,
+        fertig: istFertig,
+      });
+      fertig(name.trim());
+    } catch (e) {
+      fehler(e instanceof Error ? e.message : String(e));
+      setLaeuft(false);
+    }
+  };
+
+  return (
+    <Kasten
+      titel="Version speichern"
+      zu={zu}
+      fuss={(
+        <>
+          <button type="button" className="knopf" onClick={zu}>Abbrechen</button>
+          <button
+            type="button"
+            className="knopf haupt"
+            onClick={ablegen}
+            disabled={!name.trim() || laeuft}
+          >
+            {laeuft ? 'Wird abgelegt …' : 'Ablegen'}
+          </button>
+        </>
+      )}
+      kinder={(
+        <>
+          <label className="zeile">
+            <span>Name der Version</span>
+            <input
+              className="feld"
+              value={name}
+              autoFocus
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') ablegen(); }}
+            />
+          </label>
+          <label className="zeile">
+            <span>Kommentar — was ist an diesem Stand besonders?</span>
+            <textarea
+              className="feld"
+              value={kommentar}
+              placeholder="z. B. nach Freigabe durch den Kunden, Kennzahlen geprüft"
+              onChange={(e) => setKommentar(e.target.value)}
+            />
+          </label>
+
+          <label className="schalter" style={{ marginBottom: 14 }}>
+            <input
+              type="checkbox"
+              checked={istFertig}
+              onChange={(e) => setIstFertig(e.target.checked)}
+            />
+            Fertige Fassung — im Verlauf filterbar
+          </label>
+
+          <div className="karte" style={{ marginBottom: 0 }}>
+            <div className="reihe" style={{ alignItems: 'center' }}>
+              <div>
+                <span className="hinweis">Ziel</span>
+                <div>{zielName}</div>
+              </div>
+              <div>
+                <span className="hinweis">Typ</span>
+                <div>
+                  {stufe
+                    ? <span className={`grenze stufe ${stufe}`}>{stufenName(stufe)}</span>
+                    : '—'}
+                </div>
+              </div>
+            </div>
+            <p className="hinweis" style={{ marginTop: 10, marginBottom: 0 }}>
+              Der Typ ist die Vertraulichkeitsgrenze des Ziels und wird mitgeschrieben.
+              Er lässt sich hier nicht ändern: Eine Fassung, die aus öffentlichen Fakten
+              entstanden ist, wird nicht dadurch intern, dass man es behauptet — und
+              umgekehrt.
+            </p>
+          </div>
         </>
       )}
     />
