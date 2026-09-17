@@ -14,7 +14,7 @@ import { nachrichtAnlegen, storyAnlegen, storyAendern } from '../db/story.ts';
 import { FaktSchema } from './interview.ts';
 
 export const ImportSchema = z.object({
-  titelvorschlag: z.string().describe('Arbeitstitel aus dem Text, hoechstens 80 Zeichen'),
+  titelvorschlag: z.string().describe('Arbeitstitel aus dem Text, höchstens 80 Zeichen'),
   fakten: z.array(FaktSchema),
   luecken: z.array(z.string()).describe('was einer guten Erfolgsgeschichte hier fehlt'),
 });
@@ -33,7 +33,7 @@ export async function seiteHolen(url: string): Promise<string> {
   try {
     ziel = new URL(url);
   } catch {
-    throw new Error(`Das ist keine gueltige Adresse: ${url}`);
+    throw new Error(`Das ist keine gültige Adresse: ${url}`);
   }
   if (ziel.protocol !== 'http:' && ziel.protocol !== 'https:') {
     throw new Error('Nur http- und https-Adressen werden abgerufen.');
@@ -114,13 +114,13 @@ export async function importieren(e: {
   projektart_id?: number | null;
   autor?: string | null;
 }): Promise<ImportErgebnis> {
-  const quelle = e.url?.trim() || 'eingefuegter Text';
+  const quelle = e.url?.trim() || 'eingefügter Text';
   const text = e.url?.trim() ? await seiteHolen(e.url.trim()) : (e.text ?? '').trim();
 
   if (text.length < 200) {
     throw new Error(
-      `Der Text hat nur ${text.length} Zeichen. Das ist zu wenig fuer eine `
-      + 'Faktenextraktion - bitte den vollstaendigen Text einfuegen.',
+      `Der Text hat nur ${text.length} Zeichen. Das ist zu wenig für eine `
+      + 'Faktenextraktion — bitte den vollständigen Text einfügen.',
     );
   }
 
@@ -163,17 +163,17 @@ export async function importieren(e: {
 
   nachrichtAnlegen(
     storyId, 'notiz',
-    `Importiert aus ${quelle} — ${anzahl} Fakten uebernommen. `
-    + 'Der Gespraechsverlauf wurde nicht rekonstruiert (siehe E-08); '
+    `Importiert aus ${quelle} — ${anzahl} Fakten übernommen. `
+    + 'Der Gesprächsverlauf wurde nicht rekonstruiert (siehe E-08); '
     + 'die Fakten tragen die Quelle „import".',
   );
 
   if (antwort.luecken.length) {
     nachrichtAnlegen(
       storyId, 'assistent',
-      'Ich habe die Geschichte gelesen. Fuer eine tragfaehige Fassung fehlt mir noch '
+      'Ich habe die Geschichte gelesen. Für eine tragfähige Fassung fehlt mir noch '
       + `Folgendes: ${antwort.luecken.join('; ')}.\n\n`
-      + 'Fangen wir mit dem Wichtigsten an — was davon koennen Sie mir sagen?',
+      + 'Fangen wir mit dem Wichtigsten an — was davon können Sie mir sagen?',
     );
   }
 

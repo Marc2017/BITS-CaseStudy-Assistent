@@ -6,18 +6,37 @@
 // bei jeder Eingabe an den Anfang.
 import { useEffect, useRef, useState } from 'react';
 import {
-  api, datum, stufenName, type FassungZeile, type Fortschritt, type Ziel,
+  api, datum, stufenName, type FassungZeile, type Fortschritt, type ZielMitFreigabe,
 } from '../lib/api.ts';
 import { Denkt, Fehlerbalken, Kasten } from './teile.tsx';
 
 type Zustand = 'ruht' | 'tippt' | 'speichert' | 'gespeichert';
+
+/**
+ * Untergrenze, ab der formuliert wird - dieselbe Zahl wie in
+ * server/src/ki/formulierung.ts (I-06). Hier steht sie nur, um die Erklaerung
+ * im leeren Blatt zu schreiben; die Grenze selbst zieht der Server.
+ */
+const MINDESTFAKTEN = 4;
+
+/** Damit der Cursor einen Platz hat, wenn noch nichts geschrieben ist. */
+const LEERER_ABSATZ = '<p><br></p>';
+
+/**
+ * Ist im Editor nur Leerraum? Dann wird eine leere Fassung gespeichert.
+ *
+ * Geprueft wird auf ein Nicht-Leerraum-Zeichen und nicht mit `trim()`, weil
+ * der Editor geschuetzte Leerzeichen einstreut, die `trim()` stehen laesst -
+ * ein Blatt mit einem einzigen davon waere sonst eine Fassung.
+ */
+const istLeer = (el: HTMLElement) => !/[^\s]/.test(el.innerText);
 
 export function Blatt(
   { storyId, arbeitstitel, ziele, fassungen, zielId, setZielId, stand, kiZugang, neuLaden, fehler }:
   {
     storyId: number;
     arbeitstitel: string;
-    ziele: Ziel[];
+    ziele: ZielMitFreigabe[];
     fassungen: FassungZeile[];
     zielId: number | null;
     setZielId: (id: number) => void;
@@ -40,9 +59,14 @@ export function Blatt(
   const fassung = fassungen.find((f) => f.ziel_id === zielId) ?? null;
 
   // Inhalt in den Editor legen - nur beim Wechsel, nicht beim Tippen.
+  //
+  // Der leere Absatz ist keine Kosmetik: Gemessen im Browser hatte ein voellig
+  // leerer contenteditable keinen Platz fuer den Cursor, `activeElement` blieb
+  // BODY, und ein Klick ins Blatt tat nichts - ohne KI-Fassung war das Blatt
+  // nicht beschreibbar. Mit einem Absatz darin greift auch der native Klick.
   useEffect(() => {
     if (!blatt.current) return;
-    blatt.current.innerHTML = fassung?.inhalt ?? '';
+    blatt.current.innerHTML = fassung?.inhalt || LEERER_ABSATZ;
     setZustand('ruht');
   }, [zielId, storyId, stempel]);
 
@@ -56,7 +80,10 @@ export function Blatt(
       setZustand('speichert');
       try {
         await api.fassungSpeichern(storyId, zielId, {
-          inhalt: blatt.current.innerHTML,
+          // Ein Blatt, auf dem nur der leere Absatz steht, ist keine Fassung -
+          // sonst zaehlte es als Text und die Anleitung „noch kein Text"
+          // verschwaende.
+          inhalt: istLeer(blatt.current) ? '' : blatt.current.innerHTML,
           titel: fassung?.titel ?? null,
         });
         setZustand('gespeichert');
@@ -181,7 +208,33 @@ export function Blatt(
       </div>
 
       <div className="blatt-rolle">
-        <div className="blatt">
+        {/*
+          Ein Klick irgendwo auf das Blatt setzt den Cursor in den Text.
+          Gemessen: Ohne das war ein leeres Blatt nicht beschreibbar - der
+          Editorbereich hatte keine Hoehe, und der Klick ging ins Leere.
+        */}
+        <div
+          className="blatt"
+          onMouseUp={() => {
+            const el = blatt.current;
+            if (!el) return;
+            // Hat der Editor den Fokus schon, war der Klick ein normaler Klick
+            // in den Text - dann nicht eingreifen, sonst springt der Cursor.
+            if (document.activeElement === el) return;
+            // Eine Markierung (Text kopieren) nicht zerstoeren.
+            if (window.getSelection()?.toString()) return;
+            el.focus();
+            // Cursor ans Ende setzen. Ohne das steht er bei einem frisch
+            // fokussierten contenteditable nirgends, und die erste Taste
+            // landet im Nichts.
+            const bereich = document.createRange();
+            bereich.selectNodeContents(el);
+            bereich.collapse(false);
+            const auswahl = window.getSelection();
+            auswahl?.removeAllRanges();
+            auswahl?.addRange(bereich);
+          }}
+        >
           <h1>{fassung?.titel || arbeitstitel}</h1>
           <div className="zeile-ziel">
             {ziel?.name}
@@ -205,11 +258,14 @@ export function Blatt(
             <div className="leer-blatt">
               <h3>Noch kein Text für dieses Ziel</h3>
               <p>
-                {stand.pflichtErfuellt < 4
-                  ? 'Erst ein paar Fakten sammeln — mit weniger als vier freigegebenen '
-                    + 'Fakten würde die KI den Rest erfinden. Das ist ausgeschaltet.'
-                  : 'Genug Fakten sind da. „Formulieren" erzeugt den ersten Entwurf; '
-                    + 'danach lässt sich hier direkt weiterschreiben.'}
+                {(ziel?.freigegeben ?? 0) < MINDESTFAKTEN
+                  ? `Für dieses Ziel sind ${ziel?.freigegeben ?? 0} von ${stand.gesamt} `
+                    + `Fakten freigegeben; ${MINDESTFAKTEN} werden gebraucht. Mit weniger `
+                    + 'würde die KI den Rest erfinden — das ist ausgeschaltet. Weiter '
+                    + 'interviewen, oder im Reiter „Fakten" die Stufen prüfen.'
+                  : `${ziel?.freigegeben} Fakten sind für dieses Ziel freigegeben. `
+                    + '„Formulieren" erzeugt den ersten Entwurf; danach lässt sich hier '
+                    + 'direkt weiterschreiben.'}
               </p>
             </div>
           )}

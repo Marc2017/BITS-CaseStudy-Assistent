@@ -103,13 +103,18 @@ export interface FassungZeile {
   veraltet: boolean;
 }
 
+/** Ein Ziel mit der Zahl der Fakten, die es sehen darf (kommt vom Server). */
+export interface ZielMitFreigabe extends Ziel {
+  freigegeben: number;
+}
+
 export interface StoryVoll {
   story: StoryZeile;
   verlauf: Nachricht[];
   fakten: Fakt[];
   fortschritt: Fortschritt;
   fassungen: FassungZeile[];
-  ziele: Ziel[];
+  ziele: ZielMitFreigabe[];
   katalog: Katalogeintrag[];
   projektarten: Projektart[];
 }

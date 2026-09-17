@@ -1,12 +1,17 @@
 // Der Faktenkatalog: was eine Erfolgsgeschichte braucht (E-11).
 //
 // Abgeleitet aus der Feldstruktur von mybits.de (docs/06-referenz-website.md).
-// Die Reihenfolge ist die ERZAEHLreihenfolge, nicht die Formularreihenfolge -
+// Die Reihenfolge ist die ERZÄHLreihenfolge, nicht die Formularreihenfolge -
 // der Assistent arbeitet sie von oben nach unten ab.
 //
-// `stufe_vorschlag` ist die Vorgabe, wenn die KI nichts anderes erkennt. Sie
-// ist bewusst streng: 'oeffentlich' steht nur dort, wo eine Angabe ihrer Natur
-// nach unkritisch ist.
+// `stufe` ist die Vorgabe, wenn die KI nichts anderes erkennt. Sie ist bewusst
+// streng: 'oeffentlich' steht nur dort, wo eine Angabe ihrer Natur nach
+// unkritisch ist.
+//
+// ACHTUNG bei Änderungen: Die Schlüssel und die Stufenwerte sind Bezeichner in
+// der Datenbank und bleiben ASCII. Alles, was ein Mensch oder das Modell liest
+// (Label, Hinweis), wird in richtigem Deutsch geschrieben - ein Prompt in
+// kaputter Orthografie erzeugt Texte in kaputter Orthografie.
 import type { Stufe } from '../db/fakten.ts';
 
 export interface KatalogVorgabe {
@@ -25,8 +30,8 @@ export const KATALOG: KatalogVorgabe[] = [
     schluessel: 'kunde',
     rubrik: 'Rahmen',
     label: 'Kunde (Klarname)',
-    hinweis: 'Der Name des Auftraggebers. Bei einem internen Projekt: "BITS (intern)". '
-      + 'Immer intern - auf der Website steht er nie.',
+    hinweis: 'Der Name des Auftraggebers. Bei einem internen Projekt: „BITS (intern)". '
+      + 'Immer intern — auf der Website steht er nie.',
     pflicht: true,
     stufe: 'intern',
   },
@@ -34,9 +39,9 @@ export const KATALOG: KatalogVorgabe[] = [
     schluessel: 'kunde_anonym',
     rubrik: 'Rahmen',
     label: 'Kunde, anonymisiert',
-    hinweis: 'Wie der Kunde ohne Namen beschrieben wird: "ein mittelstaendisches '
-      + 'E-Commerce-Unternehmen", "ein Automobilkonzern". Fehlt sie, kann die '
-      + 'Website-Fassung den Kunden nicht benennen - frag danach, sobald der Kunde '
+    hinweis: 'Wie der Kunde ohne Namen beschrieben wird: „ein mittelständisches '
+      + 'E-Commerce-Unternehmen", „ein Automobilkonzern". Fehlt diese Angabe, kann die '
+      + 'Website-Fassung den Kunden nicht beschreiben — frag danach, sobald der Kunde '
       + 'bekannt ist.',
     pflicht: true,
     stufe: 'oeffentlich',
@@ -47,7 +52,7 @@ export const KATALOG: KatalogVorgabe[] = [
     label: 'Branche des Kunden',
     hinweis: 'Eine der 15 Branchen der Website: Produktion & Maschinenbau, Automotive & '
       + 'Zulieferer, Energie, Logistik & Supply Chain, Banken & Finanzsektor, '
-      + 'Gesundheitswesen, Oeffentlicher Sektor, Versicherungen, Bauindustrie, Luft- & '
+      + 'Gesundheitswesen, Öffentlicher Sektor, Versicherungen, Bauindustrie, Luft- & '
       + 'Raumfahrt, Handel & E-Commerce, Pharma & Chemie, Telekommunikation, Verkehr & '
       + 'Infrastruktur, Hotellerie & Reisen. Die Branche des KUNDEN, nicht die des '
       + 'Projekts.',
@@ -58,7 +63,7 @@ export const KATALOG: KatalogVorgabe[] = [
     schluessel: 'projekt_art',
     rubrik: 'Rahmen',
     label: 'Kundenprojekt oder intern',
-    hinweis: 'Entweder "Kundenprojekt" oder "internes Projekt". Bestimmt, ob es ueberhaupt '
+    hinweis: 'Entweder „Kundenprojekt" oder „internes Projekt". Bestimmt, ob es überhaupt '
       + 'eine Kundenfreigabe braucht.',
     pflicht: true,
     stufe: 'oeffentlich',
@@ -66,9 +71,9 @@ export const KATALOG: KatalogVorgabe[] = [
   {
     schluessel: 'projektstand',
     rubrik: 'Rahmen',
-    label: 'Laeuft noch oder abgeschlossen',
-    hinweis: 'Entscheidet das Tempus der ganzen Fassung. Frag das FRUEH - wer es am Ende '
-      + 'erfaehrt, muss alles umschreiben.',
+    label: 'Läuft noch oder abgeschlossen',
+    hinweis: 'Entscheidet das Tempus der ganzen Fassung. Frag das FRÜH — wer es am Ende '
+      + 'erfährt, muss alles umschreiben.',
     pflicht: true,
     stufe: 'oeffentlich',
   },
@@ -76,15 +81,15 @@ export const KATALOG: KatalogVorgabe[] = [
     schluessel: 'zeitraum',
     rubrik: 'Rahmen',
     label: 'Zeitraum',
-    hinweis: 'Von wann bis wann, oder seit wann. Jahreszahlen genuegen.',
+    hinweis: 'Von wann bis wann, oder seit wann. Jahreszahlen genügen.',
     stufe: 'intern',
   },
   {
     schluessel: 'projektgroesse',
     rubrik: 'Rahmen',
-    label: 'Groesse des Vorhabens',
-    hinweis: 'Personentage, Teamgroesse oder Volumen. Volumen und Preise sind vertraulich, '
-      + 'eine Teamgroesse ist es nicht.',
+    label: 'Größe des Vorhabens',
+    hinweis: 'Personentage, Teamgröße oder Volumen. Volumen und Preise sind vertraulich, '
+      + 'eine Teamgröße ist es nicht.',
     stufe: 'vertraulich',
   },
 
@@ -93,7 +98,7 @@ export const KATALOG: KatalogVorgabe[] = [
     schluessel: 'ausgangslage',
     rubrik: 'Ausgangslage',
     label: 'Lage vor dem Projekt',
-    hinweis: 'Was war der Zustand, und warum war er ein Problem? Nicht die Loesung, '
+    hinweis: 'Was war der Zustand, und warum war er ein Problem? Nicht die Lösung, '
       + 'sondern der Schmerz. Frag nach dem Konkreten: Wer hat gemerkt, dass es nicht '
       + 'geht, und woran?',
     pflicht: true,
@@ -127,7 +132,7 @@ export const KATALOG: KatalogVorgabe[] = [
     schluessel: 'herausforderung',
     rubrik: 'Herausforderung',
     label: 'Herausforderung',
-    hinweis: 'Was war schwierig - und WARUM war es schwierig? Je Herausforderung ein '
+    hinweis: 'Was war schwierig — und WARUM war es schwierig? Je Herausforderung ein '
       + 'eigener Fakt. Drei bis sechs sind die Regel auf der Website. Eine '
       + 'Herausforderung ohne Grund ist eine Behauptung.',
     pflicht: true,
@@ -138,25 +143,25 @@ export const KATALOG: KatalogVorgabe[] = [
     schluessel: 'risiko',
     rubrik: 'Herausforderung',
     label: 'Risiko oder Randbedingung',
-    hinweis: 'Regulatorik, Datenschutz, Verfuegbarkeit, Termindruck, Zertifizierungen '
+    hinweis: 'Regulatorik, Datenschutz, Verfügbarkeit, Termindruck, Zertifizierungen '
       + '(TISAX, ISO 27001).',
     mehrfach: true,
     stufe: 'oeffentlich',
   },
 
-  // ---------------------------------------------------------------- Loesung
+  // ---------------------------------------------------------------- Lösung
   {
     schluessel: 'loesung',
-    rubrik: 'Loesung',
+    rubrik: 'Lösung',
     label: 'Was gebaut wurde',
-    hinweis: 'Das Projekt in zwei bis vier Saetzen: was entstanden ist und wie es '
-      + 'funktioniert. Hier heisst "Loesung" das gebaute Projekt.',
+    hinweis: 'Das Projekt in zwei bis vier Sätzen: was entstanden ist und wie es '
+      + 'funktioniert. Hier heißt „Lösung" das gebaute Projekt.',
     pflicht: true,
     stufe: 'oeffentlich',
   },
   {
     schluessel: 'schritt',
-    rubrik: 'Loesung',
+    rubrik: 'Lösung',
     label: 'Umsetzungsschritt',
     hinweis: 'Je Schritt ein Fakt, in der Reihenfolge der Umsetzung: kurzer Titel und ein '
       + 'Satz. Auf der Website stehen vier bis sechs.',
@@ -166,11 +171,11 @@ export const KATALOG: KatalogVorgabe[] = [
   },
   {
     schluessel: 'architektur',
-    rubrik: 'Loesung',
+    rubrik: 'Lösung',
     label: 'Tragendes Konzept',
-    hinweis: 'Das Prinzip dahinter - "RAG mit Vector Embeddings", "Event-getriebene '
-      + 'Integration", "Zentrales Rechenzentrum mit Standortanbindung". Wird zur Zeile '
-      + '"Kern" in der Metazeile der Website.',
+    hinweis: 'Das Prinzip dahinter — „RAG mit Vector Embeddings", „ereignisgetriebene '
+      + 'Integration", „zentrales Rechenzentrum mit Standortanbindung". Wird zur Zeile '
+      + '„Kern" in der Metazeile der Website.',
     stufe: 'oeffentlich',
   },
 
@@ -180,7 +185,7 @@ export const KATALOG: KatalogVorgabe[] = [
     rubrik: 'Technik',
     label: 'Technologie oder Werkzeug',
     hinweis: 'Je Technologie ein Fakt: Sprachen, Frameworks, Clouds, Produkte, Methoden '
-      + '(Scrum, Agile). Schreibweise beachten: KI, nicht AI - aber Azure AI Services, '
+      + '(Scrum, Agile). Schreibweise beachten: KI, nicht AI — aber Azure AI Services, '
       + 'OpenAI und mybits.ai bleiben, wie sie sind.',
     pflicht: true,
     mehrfach: true,
@@ -190,7 +195,7 @@ export const KATALOG: KatalogVorgabe[] = [
     schluessel: 'schnittstelle',
     rubrik: 'Technik',
     label: 'Angebundenes System',
-    hinweis: 'Womit wurde integriert? Fremdprodukte sind oeffentlich, die konkrete '
+    hinweis: 'Womit wurde integriert? Fremdprodukte sind öffentlich, die konkrete '
       + 'Systemlandschaft des Kunden ist intern.',
     mehrfach: true,
     stufe: 'oeffentlich',
@@ -212,8 +217,8 @@ export const KATALOG: KatalogVorgabe[] = [
     schluessel: 'beteiligte',
     rubrik: 'Team und Rollen',
     label: 'Beteiligte Person bei BITS',
-    hinweis: 'Name und Rolle. Fuer die CV-Fassung entscheidend, fuer die Website '
-      + 'unnoetig - deshalb intern. Frag nach, WAS die Person beigetragen hat, nicht nur, '
+    hinweis: 'Name und Rolle. Für die CV-Fassung entscheidend, für die Website '
+      + 'unnötig — deshalb intern. Frag nach, WAS die Person beigetragen hat, nicht nur, '
       + 'dass sie dabei war.',
     mehrfach: true,
     stufe: 'intern',
@@ -222,8 +227,8 @@ export const KATALOG: KatalogVorgabe[] = [
     schluessel: 'zusammenarbeit',
     rubrik: 'Team und Rollen',
     label: 'Art der Zusammenarbeit',
-    hinweis: 'Vor Ort, remote, gemischtes Team mit dem Kunden, Werkvertrag, '
-      + 'Dienstleistung? Fuer die interne Referenz wichtig.',
+    hinweis: 'Vor Ort, aus der Ferne, gemischtes Team mit dem Kunden, Werkvertrag, '
+      + 'Dienstleistung? Für die interne Referenz wichtig.',
     stufe: 'intern',
   },
 
@@ -232,8 +237,8 @@ export const KATALOG: KatalogVorgabe[] = [
     schluessel: 'wirkung',
     rubrik: 'Wirkung',
     label: 'Was heute anders ist',
-    hinweis: 'Die Veraenderung im Betrieb, nicht in der Praesentation. Je Wirkung ein '
-      + 'Fakt. Wenn der Nutzer "schneller" oder "besser" sagt: nachfragen, von was auf '
+    hinweis: 'Die Veränderung im Betrieb, nicht in der Präsentation. Je Wirkung ein '
+      + 'Fakt. Wenn der Nutzer „schneller" oder „besser" sagt: nachfragen, von was auf '
       + 'was.',
     pflicht: true,
     mehrfach: true,
@@ -243,19 +248,19 @@ export const KATALOG: KatalogVorgabe[] = [
     schluessel: 'kennzahl',
     rubrik: 'Wirkung',
     label: 'Kennzahl',
-    hinweis: 'Eine Zahl mit Bezug: "von 4 Tagen auf 4 Stunden", "rund 400 Tickets pro '
-      + 'Woche". IMMER nach dem Beleg fragen. Ohne Beleg mit sicher=false aufnehmen. '
-      + 'Ein Kennzahlenband ohne Zahlen ist erlaubt (auf der Website steht dort oft '
-      + '"Automatisiert" oder "Skalierbar") - eine erfundene Prozentzahl nicht.',
+    hinweis: 'Eine Zahl mit Bezug: „von 4 Tagen auf 4 Stunden", „rund 400 Tickets pro '
+      + 'Woche". IMMER nach dem Beleg fragen. Ohne Beleg mit „sicher: false" aufnehmen. '
+      + 'Ein Kennzahlenband ohne Zahlen ist erlaubt — auf der Website steht dort oft '
+      + '„Automatisiert" oder „Skalierbar"; eine erfundene Prozentzahl ist es nicht.',
     mehrfach: true,
     stufe: 'oeffentlich',
   },
   {
     schluessel: 'nutzen_intern',
     rubrik: 'Wirkung',
-    label: 'Nutzen fuer BITS',
-    hinweis: 'Folgeauftraege, aufgebautes Wissen, neue Referenz, Produktisierung. Nur '
-      + 'fuer interne Fassungen.',
+    label: 'Nutzen für BITS',
+    hinweis: 'Folgeaufträge, aufgebautes Wissen, neue Referenz, Produktisierung. Nur '
+      + 'für interne Fassungen.',
     stufe: 'intern',
   },
 
@@ -264,7 +269,7 @@ export const KATALOG: KatalogVorgabe[] = [
     schluessel: 'kundenzitat',
     rubrik: 'Belege',
     label: 'Kundenzitat',
-    hinweis: 'Woertlich. Ein Zitat ohne Person ist kein Zitat - frag immer nach Name und '
+    hinweis: 'Wörtlich. Ein Zitat ohne Person ist kein Zitat — frag immer nach Name und '
       + 'Rolle. Bis zur Freigabe des Kunden bleibt es intern.',
     stufe: 'intern',
   },
@@ -272,15 +277,15 @@ export const KATALOG: KatalogVorgabe[] = [
     schluessel: 'zitat_person',
     rubrik: 'Belege',
     label: 'Person des Zitats',
-    hinweis: 'Name, Rolle, Unternehmen - und ob die Freigabe vorliegt.',
+    hinweis: 'Name, Rolle, Unternehmen — und ob die Freigabe vorliegt.',
     stufe: 'intern',
   },
   {
     schluessel: 'nachweis',
     rubrik: 'Belege',
     label: 'Nachweis',
-    hinweis: 'Woran eine Aussage haengt: Abnahmeprotokoll, Monitoring-Auswertung, '
-      + 'Zertifikat, Messung. Der Teil, der die Belegpflicht traegt.',
+    hinweis: 'Woran eine Aussage hängt: Abnahmeprotokoll, Monitoring-Auswertung, '
+      + 'Zertifikat, Messung. Der Teil, der die Belegpflicht trägt.',
     mehrfach: true,
     stufe: 'intern',
   },
@@ -289,10 +294,10 @@ export const KATALOG: KatalogVorgabe[] = [
   {
     schluessel: 'besonderheit',
     rubrik: 'Besonderes',
-    label: 'Was ungewoehnlich war',
-    hinweis: 'Der Teil, den nur jemand erzaehlen kann, der dabei war. Genau hier '
-      + 'entsteht der Unterschied zu einer austauschbaren Geschichte - frag danach, auch '
-      + 'wenn alles andere schon vollstaendig ist.',
+    label: 'Was ungewöhnlich war',
+    hinweis: 'Der Teil, den nur jemand erzählen kann, der dabei war. Genau hier '
+      + 'entsteht der Unterschied zu einer austauschbaren Geschichte — frag danach, auch '
+      + 'wenn alles andere schon vollständig ist.',
     mehrfach: true,
     stufe: 'intern',
   },
@@ -300,7 +305,7 @@ export const KATALOG: KatalogVorgabe[] = [
     schluessel: 'gelernt',
     rubrik: 'Besonderes',
     label: 'Was wir gelernt haben',
-    hinweis: 'Fuer die interne Referenz das Wertvollste. Auch Fehlschlaege - die sind '
+    hinweis: 'Für die interne Referenz das Wertvollste. Auch Fehlschläge — die sind '
       + 'intern oder vertraulich, aber sie sind Wissen.',
     mehrfach: true,
     stufe: 'intern',
@@ -309,7 +314,7 @@ export const KATALOG: KatalogVorgabe[] = [
     schluessel: 'leistung',
     rubrik: 'Besonderes',
     label: 'Passende BITS-Leistung',
-    hinweis: 'Welche Leistung von mybits.de passt dazu? Fuer die Verlinkung auf der '
+    hinweis: 'Welche Leistung von mybits.de passt dazu? Für die Verlinkung auf der '
       + 'Website.',
     mehrfach: true,
     stufe: 'oeffentlich',

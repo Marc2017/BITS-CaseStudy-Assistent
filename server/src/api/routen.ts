@@ -2,8 +2,8 @@
 // Daten zurueck; das Serialisieren uebernimmt server.ts.
 import { alle, schreib } from '../db/index.ts';
 import {
-  fakten, faktAendern, faktLoeschen, faktSetzen, fortschritt, katalog,
-  type Stufe,
+  fakten, faktAendern, faktenFuerZiel, faktLoeschen, faktSetzen, fortschritt,
+  katalog, type Stufe,
 } from '../db/fakten.ts';
 import {
   fassung, fassungen, fassungSpeichern, nachrichtAnlegen, sicherung, sicherungen,
@@ -98,7 +98,13 @@ export function storyVoll(k: Kontext) {
         veraltet: f.inhalt ? fakten(id).length > f.fakten_stand : false,
       };
     }),
-    ziele: ziele(),
+    // Je Ziel die Zahl der Fakten, die es sehen darf. Sie kommt vom Server,
+    // damit die Oberflaeche die Filterung nicht nachbaut (I-04) - sonst gaebe
+    // es zwei Rechnungen fuer dieselbe Grenze, und eine davon waere falsch.
+    ziele: ziele().map((z) => ({
+      ...z,
+      freigegeben: faktenFuerZiel(id, z.stufe).length,
+    })),
     katalog: katalog(),
     projektarten: projektarten(),
   };
@@ -175,7 +181,7 @@ export function faktWeg(k: Kontext) {
 export async function fassungFormulieren(k: Kontext) {
   const id = nr(k, 'id');
   const zielId = Number(k.body.ziel_id);
-  if (!zielId) throw new Fehlerhaft('Kein Ziel gewaehlt.');
+  if (!zielId) throw new Fehlerhaft('Kein Ziel gewählt.');
   const ergebnis = await formulieren(id, zielId);
   return { ...ergebnis, fassungen: storyVoll(k).fassungen };
 }
@@ -191,7 +197,7 @@ export function fassungHand(k: Kontext) {
     titel: text(k, 'titel') ?? null,
     inhalt,
     handisch: true,
-    grund: 'von Hand geaendert',
+    grund: 'von Hand geändert',
   });
   return { fassung: fassung(id, zielId) };
 }
@@ -209,7 +215,7 @@ export function fassungZurueck(k: Kontext) {
   if (!s) throw new Fehlerhaft('Diese Sicherung gibt es nicht.');
   fassungSpeichern({
     storyId: id, zielId, titel: s.titel, inhalt: s.inhalt,
-    handisch: true, grund: 'auf eine Sicherung zurueckgesetzt',
+    handisch: true, grund: 'auf eine Sicherung zurückgesetzt',
   });
   return { fassung: fassung(id, zielId) };
 }
@@ -246,7 +252,7 @@ export function lernListe(k: Kontext) {
 
 export function lernUebernehmen(k: Kontext) {
   const r = lernnotizUebernehmen(nr(k, 'id'));
-  if (!r.ok) throw new Fehlerhaft(r.hinweis ?? 'Nicht moeglich.');
+  if (!r.ok) throw new Fehlerhaft(r.hinweis ?? 'Nicht möglich.');
   return { ...r, notizen: lernnotizen('offen') };
 }
 

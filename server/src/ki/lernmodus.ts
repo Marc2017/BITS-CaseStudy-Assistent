@@ -11,8 +11,8 @@ import { projektart, ziel } from '../db/vorlagen.ts';
 export const LernSchema = z.object({
   notizen: z.array(z.object({
     bezug: z.enum(['ziel', 'projektart', 'katalog']),
-    text: z.string().describe('die Frage oder Eigenheit, kuenftig zu beachten'),
-    begruendung: z.string().describe('woran im Gespraech das aufgefallen ist'),
+    text: z.string().describe('die Frage oder Eigenheit, die künftig zu beachten ist'),
+    begruendung: z.string().describe('woran im Gespräch das aufgefallen ist'),
   })).max(3),
 });
 
@@ -39,13 +39,13 @@ export async function auswerten(
   if (!lernenErlaubt) {
     return {
       angelegt: 0,
-      uebersprungen: 'Lernmodus ist fuer diese Projektart und dieses Ziel aus.',
+      uebersprungen: 'Lernmodus ist für diese Projektart und dieses Ziel aus.',
     };
   }
 
   const gespraech = verlauf(storyId).filter((n) => n.rolle !== 'notiz');
   if (gespraech.length < 4) {
-    return { angelegt: 0, uebersprungen: 'Das Gespraech ist zu kurz fuer eine Auswertung.' };
+    return { angelegt: 0, uebersprungen: 'Das Gespräch ist zu kurz für eine Auswertung.' };
   }
 
   const wechselnd = [
@@ -56,7 +56,7 @@ export async function auswerten(
     '',
     faktenText(fakten(storyId), 'Herausgekommener Faktenbestand'),
     '',
-    '# Das Gespraech',
+    '# Das Gespräch',
     ...gespraech.map((n) => `${n.rolle === 'nutzer' ? 'NUTZER' : 'ASSISTENT'}: ${n.text}`),
   ].filter(Boolean).join('\n');
 
@@ -64,7 +64,7 @@ export async function auswerten(
     {
       systemStabil: LERNER,
       systemWechselnd: wechselnd,
-      verlauf: [{ rolle: 'nutzer', text: 'Werte dieses Gespraech aus.' }],
+      verlauf: [{ rolle: 'nutzer', text: 'Werte dieses Gespräch aus.' }],
       effort: 'medium',
     },
     LernSchema, 'lernnotizen',

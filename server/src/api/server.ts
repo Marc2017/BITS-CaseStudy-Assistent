@@ -80,7 +80,7 @@ async function koerper(req: IncomingMessage): Promise<Record<string, unknown>> {
     const d = JSON.parse(roh);
     return (d && typeof d === 'object') ? d as Record<string, unknown> : {};
   } catch {
-    throw new r.Fehlerhaft('Der Anfragekoerper ist kein gueltiges JSON.');
+    throw new r.Fehlerhaft('Der Anfragekörper ist kein gültiges JSON.');
   }
 }
 
@@ -113,9 +113,9 @@ async function statisch(pfad: string, res: ServerResponse): Promise<void> {
   } catch {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end(
-      'Das Frontend ist nicht gebaut. Im Entwicklungsbetrieb laeuft es unter\n'
-      + 'http://localhost:5273 (npm run web); fuer den Einzelbetrieb erst\n'
-      + '"npm run build" ausfuehren.\n',
+      'Das Frontend ist nicht gebaut. Im Entwicklungsbetrieb läuft es unter\n'
+      + 'http://localhost:5273 (npm run web); für den Einzelbetrieb erst\n'
+      + '"npm run build" ausführen.\n',
     );
   }
 }
@@ -159,7 +159,7 @@ const server = createServer(async (req, res) => {
   }
 
   res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
-  res.end(JSON.stringify({ fehler: `Kein Endpunkt fuer ${req.method} ${url.pathname}.` }));
+  res.end(JSON.stringify({ fehler: `Kein Endpunkt für ${req.method} ${url.pathname}.` }));
 });
 
 datenbank();

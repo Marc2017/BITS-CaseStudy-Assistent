@@ -111,6 +111,14 @@ Mitgeliefert und in der Verwaltung änderbar:
   (268 KB JS, 14 KB CSS).
 - Erstausstattung eingespielt und über die API gelesen: 30 Rubriken, 4 Ziele,
   7 Projektarten.
+- **Die Faktenfilterung an echten Daten:** sieben Fakten (fünf öffentlich, einer
+  intern, einer vertraulich) → die Website-Fassung sieht fünf, die drei internen
+  Ziele sechs, der vertrauliche bleibt überall draußen.
+- Eine von Hand geschriebene Fassung wird gespeichert und trägt `handisch = 1`;
+  eine gelöschte Geschichte nimmt Fakten, Verlauf und Fassungen mit
+  (`ON DELETE CASCADE`).
+- Im Browser durchgesehen: Startseite, Arbeitsbereich mit beiden Reitern,
+  Verwaltung. Fünf Befunde gefunden und behoben (`docs/04-aenderungen.md`).
 
 ## Offene Punkte
 

@@ -42,9 +42,9 @@ export async function formulieren(
   // I-06: lieber nichts als Erfundenes.
   if (erlaubt.length < MINDESTFAKTEN) {
     throw new Error(
-      `Fuer das Ziel „${z0.name}" liegen nur ${erlaubt.length} freigegebene Fakten vor `
+      `Für das Ziel „${z0.name}" liegen nur ${erlaubt.length} freigegebene Fakten vor `
       + `(von ${gesamt} insgesamt, Grenze dieses Ziels: ${z0.stufe}). `
-      + `Mindestens ${MINDESTFAKTEN} werden gebraucht - sonst erfindet die KI den Rest. `
+      + `Mindestens ${MINDESTFAKTEN} werden gebraucht — sonst erfindet die KI den Rest. `
       + 'Erst weiter interviewen oder Fakten freigeben.',
     );
   }
@@ -57,9 +57,9 @@ export async function formulieren(
     `# Ziel dieser Fassung: ${z0.name}`,
     z0.beschreibung ?? null,
     '',
-    '## Anweisung fuer dieses Ziel',
+    '## Anweisung für dieses Ziel',
     z0.prompt,
-    z0.laenge ? `\nRichtwert fuer die Laenge: ${z0.laenge}` : null,
+    z0.laenge ? `\nRichtwert für die Länge: ${z0.laenge}` : null,
     '',
     strukturText(abschnitte),
     '',
@@ -69,8 +69,8 @@ export async function formulieren(
   ].filter((x) => x !== null).join('\n');
 
   const auftrag = alt?.inhalt
-    ? 'Hier ist die bisherige Fassung. Ueberarbeite sie auf Grundlage der Fakten oben - '
-      + 'behalte gelungene Formulierungen, ergaenze Neues, entferne, was keine Grundlage '
+    ? 'Hier ist die bisherige Fassung. Überarbeite sie auf Grundlage der Fakten oben: '
+      + 'behalte gelungene Formulierungen, ergänze Neues, entferne, was keine Grundlage '
       + `mehr hat:\n\n${alt.inhalt}`
     : 'Formuliere die Fassung.';
 
@@ -113,9 +113,9 @@ export async function textUmformulieren(
     '',
     '# Sonderfall: eine einzelne Textstelle',
     'Du bekommst einen Ausschnitt und eine Anweisung. Gib **nur** den neuen',
-    'Ausschnitt zurueck, im gleichen HTML-Format, ohne Vorrede und ohne',
-    'Erklaerung. Keine Tatsache hinzufuegen, keine Zahl aendern, keinen Namen',
-    'erfinden - auch nicht, wenn die Anweisung nach mehr Wirkung verlangt.',
+    'Ausschnitt zurück, im gleichen HTML-Format, ohne Vorrede und ohne',
+    'Erklärung. Keine Tatsache hinzufügen, keine Zahl ändern, keinen Namen',
+    'erfinden — auch nicht, wenn die Anweisung nach mehr Wirkung verlangt.',
   ].join('\n');
 
   return frageText({

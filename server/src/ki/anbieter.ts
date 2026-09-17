@@ -76,7 +76,7 @@ export function zugangVorhanden(): boolean {
 export class KeinZugang extends Error {
   constructor(text?: string) {
     super(text ?? 'Kein KI-Zugang hinterlegt. Die KI-Funktionen sind deshalb aus. '
-      + 'Zugang unter Verwaltung -> Einstellungen eintragen (wirkt sofort) oder in die '
+      + 'Zugang unter Verwaltung → Einstellungen eintragen (wirkt sofort) oder in die '
       + 'Datei .env schreiben (Vorlage: .env.example, danach Server neu starten).');
     this.name = 'KeinZugang';
   }
@@ -109,16 +109,16 @@ export function klientVerwerfen(): void {
 export function fehlerText(e: unknown): string {
   if (e instanceof KeinZugang) return e.message;
   if (e instanceof Anthropic.AuthenticationError) {
-    return 'Der API-Schluessel wurde abgelehnt. Bitte in den Einstellungen pruefen.';
+    return 'Der API-Schlüssel wurde abgelehnt. Bitte in den Einstellungen prüfen.';
   }
   if (e instanceof Anthropic.RateLimitError) {
-    return 'Das Kontingent ist gerade erschoepft. In einem Moment nochmal versuchen.';
+    return 'Das Kontingent ist gerade erschöpft. Bitte in einem Moment noch einmal versuchen.';
   }
   if (e instanceof Anthropic.BadRequestError) {
     return `Die Anfrage wurde abgelehnt: ${e.message}`;
   }
   if (e instanceof Anthropic.APIConnectionError) {
-    return 'Keine Verbindung zur KI-API. Netzwerk oder Endpunkt pruefen.';
+    return 'Keine Verbindung zur KI-API. Netzwerk oder Endpunkt prüfen.';
   }
   if (e instanceof Anthropic.APIError) {
     return `Fehler der KI-API (${e.status}): ${e.message}`;
@@ -172,10 +172,10 @@ async function anthropicJson<T>(a: Auftrag, schema: z.ZodType<T>): Promise<T> {
     },
   });
   if (antwort.stop_reason === 'refusal') {
-    throw new Error('Die KI hat die Anfrage abgelehnt. Bitte den Text pruefen.');
+    throw new Error('Die KI hat die Anfrage abgelehnt. Bitte den Text prüfen.');
   }
   if (!antwort.parsed_output) {
-    throw new Error('Die KI hat keine verwertbare Antwort geliefert (Struktur leer).');
+    throw new Error('Die KI hat keine verwertbare Antwort geliefert — die Struktur kam leer zurück.');
   }
   return antwort.parsed_output;
 }
@@ -212,8 +212,8 @@ async function azureAufruf(a: Auftrag, format?: unknown): Promise<string> {
   const z = azureZugang();
   if (!z) {
     throw new KeinZugang(
-      'Kein Azure-Zugang hinterlegt. Endpunkt, Deployment und Schluessel werden alle drei '
-      + 'gebraucht (Verwaltung -> Einstellungen).',
+      'Kein Azure-Zugang hinterlegt. Endpunkt, Deployment und Schlüssel werden alle '
+      + 'drei gebraucht (Verwaltung → Einstellungen).',
     );
   }
   const url = `${z.endpunkt}/openai/deployments/${z.deployment}`

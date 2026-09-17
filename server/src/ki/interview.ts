@@ -16,19 +16,19 @@ const StufeSchema = z.enum(['oeffentlich', 'intern', 'vertraulich']);
  * Ausgabe ist ein fehlendes Feld eine Fehlerquelle, ein leeres nicht.
  */
 export const FaktSchema = z.object({
-  schluessel: z.string().describe('Kleinbuchstaben-Schluessel, moeglichst aus dem Katalog'),
+  schluessel: z.string().describe('Kleinbuchstaben-Schlüssel, möglichst aus dem Katalog'),
   wert: z.string().describe('die Tatsache in einem Satz oder einer Wortgruppe'),
   stufe: StufeSchema,
   beleg: z.string().nullable().describe('woher die Angabe kommt, sonst null'),
-  sicher: z.boolean().describe('false, wenn unbelegt oder vom Nutzer nicht bestaetigt'),
+  sicher: z.boolean().describe('false, wenn unbelegt oder vom Nutzer nicht bestätigt'),
 });
 
 export const InterviewSchema = z.object({
   fakten: z.array(FaktSchema).describe('nur Neues oder Korrigiertes'),
   frage: z.string().describe('genau eine Frage an den Nutzer'),
   hinweis: z.string().nullable(),
-  luecken: z.array(z.string()).describe('Katalogschluessel, die als naechstes dran waeren'),
-  reif: z.boolean().describe('reicht der Bestand fuer eine Fassung?'),
+  luecken: z.array(z.string()).describe('Katalogschlüssel, die als Nächstes dran wären'),
+  reif: z.boolean().describe('reicht der Bestand für eine Fassung?'),
 });
 
 export type Interview = z.infer<typeof InterviewSchema>;

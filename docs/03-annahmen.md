@@ -26,11 +26,21 @@ Fragen.
 
 ### A-03 — `document.execCommand` trägt den WYSIWYG-Editor noch
 
-*bestätigt für Chrome/Edge 2026, aber abgekündigt*
+*teilweise bestätigt, 17.09.2026 — abgekündigt, aber funktionsfähig*
 
 Funktioniert in allen aktuellen Browsern; ein Ersatz wäre ein lokaler Umbau in
-`Editor.tsx` (Selection-API und eigene Befehle) und betrifft keine andere
+`Blatt.tsx` (Selection-API und eigene Befehle) und betrifft keine andere
 Datei.
+
+Was am 17.09.2026 gemessen wurde: Der Editor nimmt Fokus an, eine Eingabe löst
+`onInput` aus, die Fassung wird gespeichert und trägt `handisch = 1`. Was
+**nicht** gemessen ist: die Werkzeugleiste (fett, Überschrift, Liste, Lücke)
+und eine längere Tastatureingabe — die Browsersteuerung erreicht ein
+`contenteditable` nicht zuverlässig. Erster Handgriff beim nächsten Durchlauf.
+
+Ein Nebenbefund, der bleibt: Ein leerer `contenteditable` braucht einen
+Absatz als Startinhalt und eine Mindesthöhe, sonst kann niemand den Cursor
+hineinsetzen (siehe `04-aenderungen.md`).
 
 ### A-04 — Die kanonische Abschnittsfolge der Website ist stabil
 

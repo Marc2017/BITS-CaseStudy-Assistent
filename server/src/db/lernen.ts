@@ -68,7 +68,7 @@ export function lernnotizAnlegen(e: {
  */
 export function lernnotizUebernehmen(id: number): { ok: boolean; hinweis?: string } {
   const n = eine<Lernnotiz>('SELECT * FROM lernnotiz WHERE id = ?', id);
-  if (!n) return { ok: false, hinweis: 'Notiz nicht gefunden.' };
+  if (!n) return { ok: false, hinweis: 'Diese Notiz gibt es nicht.' };
 
   if (n.bezug === 'projektart' && n.bezug_id) hinweisErgaenzen(n.bezug_id, n.text);
   else if (n.bezug === 'ziel' && n.bezug_id) promptErgaenzen(n.bezug_id, n.text);
@@ -77,7 +77,7 @@ export function lernnotizUebernehmen(id: number): { ok: boolean; hinweis?: strin
   return {
     ok: true,
     hinweis: n.bezug === 'katalog'
-      ? 'Als uebernommen markiert. Der Faktenkatalog wird von Hand gepflegt.'
+      ? 'Als übernommen markiert. Der Faktenkatalog wird von Hand gepflegt.'
       : undefined,
   };
 }
