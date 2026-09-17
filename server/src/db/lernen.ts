@@ -1,11 +1,11 @@
 // Lernnotizen: Beobachtungen aus Gespraechen, die eine Vorlage besser machen
 // koennten - als Vorschlag, nicht als stille Aenderung (E-07).
 import { alle, schreib, eine } from './index.ts';
-import { hinweisErgaenzen, promptErgaenzen } from './vorlagen.ts';
+import { hinweisErgaenzen, kundenHinweisErgaenzen, promptErgaenzen } from './vorlagen.ts';
 
 export interface Lernnotiz {
   id: number;
-  bezug: 'ziel' | 'projektart' | 'katalog';
+  bezug: 'ziel' | 'projektart' | 'kunde' | 'katalog';
   bezug_id: number | null;
   text: string;
   begruendung: string | null;
@@ -24,6 +24,7 @@ export function lernnotizen(status = 'offen'): LernnotizZeile[] {
     `SELECT l.*,
             CASE l.bezug
               WHEN 'projektart' THEN (SELECT name FROM projektart WHERE id = l.bezug_id)
+              WHEN 'kunde'      THEN (SELECT name FROM kunde WHERE id = l.bezug_id)
               WHEN 'ziel'       THEN (SELECT name FROM ziel WHERE id = l.bezug_id)
               ELSE NULL END AS bezug_name,
             (SELECT arbeitstitel FROM story WHERE id = l.story_id) AS story_titel
@@ -71,6 +72,7 @@ export function lernnotizUebernehmen(id: number): { ok: boolean; hinweis?: strin
   if (!n) return { ok: false, hinweis: 'Diese Notiz gibt es nicht.' };
 
   if (n.bezug === 'projektart' && n.bezug_id) hinweisErgaenzen(n.bezug_id, n.text);
+  else if (n.bezug === 'kunde' && n.bezug_id) kundenHinweisErgaenzen(n.bezug_id, n.text);
   else if (n.bezug === 'ziel' && n.bezug_id) promptErgaenzen(n.bezug_id, n.text);
 
   schreib("UPDATE lernnotiz SET status = 'uebernommen' WHERE id = ?", id);

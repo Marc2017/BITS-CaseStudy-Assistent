@@ -6,6 +6,7 @@ export interface Story {
   id: number;
   arbeitstitel: string;
   projektart_id: number | null;
+  kunde_id: number | null;
   status: 'aktiv' | 'fertig' | 'archiv';
   autor: string | null;
   herkunft: 'interview' | 'import';
@@ -16,6 +17,7 @@ export interface Story {
 
 export interface StoryZeile extends Story {
   projektart: string | null;
+  kunde_name: string | null;
   kunde: string | null;
   branche: string | null;
   fakten_anzahl: number;
@@ -34,7 +36,7 @@ export function storys(status?: string): StoryZeile[] {
   const filter = status ? 'WHERE s.status = ?' : '';
   const p = status ? [status] : [];
   return alle<StoryZeile>(
-    `SELECT s.*, p.name AS projektart,
+    `SELECT s.*, p.name AS projektart, ku.name AS kunde_name,
             (SELECT wert FROM fakt f WHERE f.story_id = s.id AND f.schluessel = 'kunde'
               ORDER BY f.geaendert_am DESC LIMIT 1) AS kunde,
             (SELECT wert FROM fakt f WHERE f.story_id = s.id AND f.schluessel = 'branche'
@@ -45,6 +47,7 @@ export function storys(status?: string): StoryZeile[] {
               AS fassungen
        FROM story s
        LEFT JOIN projektart p ON p.id = s.projektart_id
+       LEFT JOIN kunde ku ON ku.id = s.kunde_id
        ${filter}
       ORDER BY s.geaendert_am DESC`,
     ...p,
@@ -58,15 +61,16 @@ export function story(id: number): StoryZeile | undefined {
 export function storyAnlegen(e: {
   arbeitstitel: string;
   projektart_id?: number | null;
+  kunde_id?: number | null;
   autor?: string | null;
   herkunft?: 'interview' | 'import';
   quelle?: string | null;
 }): number {
   const { id } = schreib(
-    `INSERT INTO story (arbeitstitel, projektart_id, autor, herkunft, quelle)
-     VALUES (?,?,?,?,?)`,
-    e.arbeitstitel.trim(), e.projektart_id ?? null, e.autor ?? null,
-    e.herkunft ?? 'interview', e.quelle ?? null,
+    `INSERT INTO story (arbeitstitel, projektart_id, kunde_id, autor, herkunft, quelle)
+     VALUES (?,?,?,?,?,?)`,
+    e.arbeitstitel.trim(), e.projektart_id ?? null, e.kunde_id ?? null,
+    e.autor ?? null, e.herkunft ?? 'interview', e.quelle ?? null,
   );
   return id;
 }
@@ -78,6 +82,7 @@ export function storyAendern(id: number, e: Partial<Story>): void {
   if (e.projektart_id !== undefined) {
     felder.push('projektart_id = ?'); werte.push(e.projektart_id);
   }
+  if (e.kunde_id !== undefined) { felder.push('kunde_id = ?'); werte.push(e.kunde_id); }
   if (e.status !== undefined) { felder.push('status = ?'); werte.push(e.status); }
   if (e.autor !== undefined) { felder.push('autor = ?'); werte.push(e.autor); }
   if (!felder.length) return;

@@ -8,7 +8,9 @@ import { useEffect, useRef, useState } from 'react';
 import {
   api, datum, stufenName, type FassungZeile, type Fortschritt, type ZielMitFreigabe,
 } from '../lib/api.ts';
-import { Denkt, Fehlerbalken, Kasten } from './teile.tsx';
+import {
+  Arbeitsanzeige, Denkt, Fehlerbalken, Kasten, useFortgang,
+} from './teile.tsx';
 
 type Zustand = 'ruht' | 'tippt' | 'speichert' | 'gespeichert';
 
@@ -54,6 +56,7 @@ export function Blatt(
   const [frage, setFrage] = useState<null | 'ueberschreiben' | 'verlauf'>(null);
   const [stempel, setStempel] = useState(0);
   const [umLaeuft, setUmLaeuft] = useState(false);
+  const { stand: fortgangStand, fortgang, zuruecksetzen } = useFortgang();
 
   const ziel = ziele.find((z) => z.id === zielId) ?? null;
   const fassung = fassungen.find((f) => f.ziel_id === zielId) ?? null;
@@ -101,8 +104,9 @@ export function Blatt(
     setFrage(null);
     setFormuliert(true);
     setMeldung(null);
+    zuruecksetzen();
     try {
-      const r = await api.formulieren(storyId, zielId);
+      const r = await api.formulieren(storyId, zielId, fortgang);
       setLuecken(r.luecken);
       setMeldung(
         `Formuliert aus ${r.verwendete_fakten} freigegebenen Fakten.`
@@ -138,8 +142,9 @@ export function Blatt(
       return;
     }
     setUmLaeuft(true);
+    zuruecksetzen();
     try {
-      const r = await api.umformulieren(text, auftrag);
+      const r = await api.umformulieren(text, auftrag, fortgang);
       befehl('insertText', r.text.replace(/<[^>]+>/g, ''));
     } catch (e) {
       fehler(e instanceof Error ? e.message : String(e));
@@ -271,9 +276,13 @@ export function Blatt(
           )}
 
           {formuliert && (
-            <p style={{ color: 'var(--tinte-2)', font: '13px/1.5 var(--sans)' }}>
-              Die Fassung entsteht. Bei einem langen Text dauert das eine bis zwei Minuten.
-            </p>
+            <div style={{ margin: '18px 0 24px' }}>
+              <Arbeitsanzeige
+                stand={fortgangStand}
+                hell
+                text="schreibt die Fassung …"
+              />
+            </div>
           )}
 
           <div

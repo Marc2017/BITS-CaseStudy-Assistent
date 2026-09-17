@@ -62,12 +62,30 @@ CREATE TABLE IF NOT EXISTS faktenrubrik (
   aktiv           INTEGER NOT NULL DEFAULT 1
 );
 
+-- -------------------------------------------------------------------- Kunden
+-- Ein Kunde ist eine eigene Achse, keine Projektart (E-14): Dieselbe
+-- Projektart kommt bei vielen Kunden vor, und was man bei einem bestimmten
+-- Kunden fragen muss, gilt dort fuer jede Projektart. Der Interview-Kontext
+-- ist die Kombination aus beidem.
+CREATE TABLE IF NOT EXISTS kunde (
+  id           INTEGER PRIMARY KEY,
+  name         TEXT NOT NULL UNIQUE,
+  branche      TEXT,
+  hinweise     TEXT,
+  anonym       TEXT,          -- wie der Kunde ohne Namen beschrieben wird
+  lernmodus    INTEGER NOT NULL DEFAULT 1,
+  sort         INTEGER NOT NULL DEFAULT 0,
+  aktiv        INTEGER NOT NULL DEFAULT 1,
+  erstellt_am  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- ---------------------------------------------------------- Erfolgsgeschichte
 -- Nur Steuerdaten. Inhalt steht als Fakt, nicht als Spalte (I-03).
 CREATE TABLE IF NOT EXISTS story (
   id            INTEGER PRIMARY KEY,
   arbeitstitel  TEXT NOT NULL,
   projektart_id INTEGER REFERENCES projektart(id) ON DELETE SET NULL,
+  kunde_id      INTEGER REFERENCES kunde(id) ON DELETE SET NULL,
   status        TEXT NOT NULL DEFAULT 'aktiv'
                 CHECK (status IN ('aktiv','fertig','archiv')),
   autor         TEXT,
@@ -141,7 +159,8 @@ CREATE INDEX IF NOT EXISTS sicherung_fassung ON fassung_sicherung(fassung_id, id
 -- Vorschlaege, keine stille Selbstveraenderung (E-07).
 CREATE TABLE IF NOT EXISTS lernnotiz (
   id          INTEGER PRIMARY KEY,
-  bezug       TEXT NOT NULL CHECK (bezug IN ('ziel','projektart','katalog')),
+  bezug       TEXT NOT NULL
+              CHECK (bezug IN ('ziel','projektart','kunde','katalog')),
   bezug_id    INTEGER,
   text        TEXT NOT NULL,
   begruendung TEXT,

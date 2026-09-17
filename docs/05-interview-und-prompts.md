@@ -27,8 +27,12 @@ In dieser Reihenfolge — stabile Teile zuerst, damit der Prompt-Cache greift:
 1. **Rollenanweisung** (fest, `ki/prompts.ts`): wer der Assistent ist, wie er
    fragt, die Belegpflicht, die Klassen A/B/C aus dem Redaktionsleitfaden.
 2. **Faktenkatalog** (aus `faktenrubrik`): Schlüssel, Label, Hinweis, Pflicht.
-3. **Hinweise der Projektart** (aus `projektart.hinweise`) — der Teil, der über
-   Zeit wächst.
+3. **Hinweise der Projektart** (aus `projektart.hinweise`) **und des Kunden**
+   (aus `kunde.hinweise`) — die Teile, die über Zeit wachsen. Beide getrennt
+   benannt: Die Projektart sagt, was bei dieser Art Vorhaben zu fragen ist,
+   der Kunde, was bei diesem Auftraggeber gilt (E-14). Die Trennung ist nicht
+   Kosmetik — im Lernmodus muss zuzuordnen sein, wohin eine neue Beobachtung
+   gehört.
 4. **Der Faktenbestand** dieser Geschichte, vollständig (hier gibt es keine
    Vertraulichkeitsfilterung — der Nutzer arbeitet an seinem eigenen Projekt).
 5. **Der Gesprächsverlauf** als `messages`.
@@ -159,3 +163,55 @@ wird mit `cache_control` markiert. Er ist bei jedem Interviewschritt derselbe;
 ohne Cache wäre er der größte Kostenblock. Zu prüfen ist
 `usage.cache_read_input_tokens` — steht der bei null, invalidiert irgendetwas
 im Prompt still den Cache (typisch: ein Zeitstempel).
+
+
+---
+
+## 6. Zwei Hilfen bei der Eingabe (E-15)
+
+Beide sitzen unter dem Eingabefeld und beziehen sich auf die **letzte Frage**
+des Assistenten.
+
+### „Eins nach dem anderen abfragen"
+
+Ein Aufruf (`ki/hilfe.ts → zerlegen`) liefert zwei bis fünf Teilfragen, jede
+mit optionalem Hinweis. Die Oberfläche zeigt sie als Liste mit je einem Feld;
+gesendet wird eine zusammengesetzte Antwort im Format `Frage Antwort` je
+Zeile — so bleibt für den Assistenten zuordenbar, was worauf antwortet.
+
+Der Prompt darf **nichts Neues** einführen: Er zerlegt die vorhandene Frage,
+er erweitert sie nicht um Themen, die der Assistent nicht gefragt hat.
+
+### „Antwort vorschlagen"
+
+Ein Aufruf (`ki/hilfe.ts → beispielantwort`) entwirft die wahrscheinlichste
+Antwort aus dem Bestand. **Hier wird geraten**, und deshalb gilt:
+
+- Jede geratene Angabe steht in eckigen Klammern: `[X Stunden]`.
+- Das Modell liefert zusätzlich `geraten` — eine Klartextliste, die über dem
+  Eingabefeld erscheint.
+- Der Vorschlag landet **im Eingabefeld, nicht im Gespräch**. Absenden bleibt
+  eine Handlung des Nutzers.
+
+Ohne diese drei Sicherungen wäre die Funktion gefährlich: Ein geratener Wert,
+der unbemerkt abgesendet wird, ist im Bestand von einer echten Angabe nicht
+mehr zu unterscheiden.
+
+---
+
+## 7. Fortschritt anzeigen (E-16)
+
+Alle fünf KI-Endpunkte antworten als Server-Sent-Events. Gemeldet werden
+
+- **Schritte** des Servers („70 Fakten und 5 Gesprächsschritte im Kontext"),
+- **Denkschritte** des Modells, satzweise gepuffert,
+- die **Länge** der entstehenden Antwort, alle 200 Zeichen.
+
+Technisch: `messages.stream()` mit `output_config.format` — `messages.parse()`
+kann nicht streamen, `finalMessage()` liefert trotzdem `parsed_output`. Und
+`thinking: { type: 'adaptive', display: 'summarized' }`: Bei Claude Opus 5 ist
+die Vorgabe `omitted`, und dann kommen leere Denkblöcke an.
+
+Die Denkschritte kamen im ersten Lauf auf **Englisch** — das Modell denkt in
+seiner Arbeitssprache. Da sie dem Nutzer angezeigt werden, steht die Bitte um
+Deutsch jetzt in `REDAKTION` und gilt damit für jeden Prompt.

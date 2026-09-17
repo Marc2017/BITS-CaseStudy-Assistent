@@ -6,9 +6,9 @@ formuliert daraus so viele Fassungen, wie gebraucht werden — für die Website,
 als interne Kundenreferenz, als Absatz in einem Profil, als Referenz in einem
 Angebot.
 
-**Stand: 17.09.2026** — Proof of Concept lauffähig. Backend, Oberfläche,
-Erstausstattung und 14 Tests stehen; die KI-Funktionen sind gebaut, aber noch
-nicht gegen einen echten Schlüssel gemessen (siehe „Offene Punkte").
+**Stand: 17.09.2026** — Proof of Concept lauffähig und **mit echter KI
+durchgemessen**: Import, Interview, beide Fassungen und die Eingabehilfen
+laufen. Zahlen unter „Was gemessen ist".
 
 ---
 
@@ -35,11 +35,30 @@ liegt, wird der KI gar nicht mitgeschickt.
 Links die Entwicklung, rechts das Ergebnis:
 
 - **Gespräch** — das Interview. Nach jeder Antwort werden Fakten extrahiert; in
-  der Faktenspur oben leuchtet auf, was dazugekommen ist.
+  der Faktenspur oben leuchtet auf, was dazugekommen ist. Zwei Hilfen senken
+  die Eingabehürde: **„Eins nach dem anderen abfragen"** zerlegt eine Frage in
+  Teilfragen mit eigenen Feldern, **„Antwort vorschlagen"** entwirft eine
+  Antwort zum Prüfen — mit jeder geratenen Angabe in eckigen Klammern.
 - **Fakten** — der Bestand, sichtbar und korrigierbar. Die Stufe jedes Fakts
   ist mit einem Klick änderbar. Darunter steht, was noch fehlt.
 - **Erfolgsgeschichte** — die Fassung zum gewählten Ziel, als Blatt im
   WYSIWYG-Editor. Handgeschriebenes wird nie stillschweigend überschrieben.
+
+Während die KI arbeitet, zeigt die Oberfläche, was sie tut: Arbeitsschritt,
+verstrichene Zeit und die Zwischenüberlegungen des Modells.
+
+## Projektart und Kunde
+
+Zwei Achsen steuern das Interview, und der Assistent bekommt **beide**:
+
+- Die **Projektart** sagt, was bei dieser Art Vorhaben zu fragen ist („bei
+  Cloud-Projekten nach dem Wartungsfenster fragen").
+- Der **Kunde** sagt, was bei diesem Auftraggeber gilt, unabhängig von der
+  Projektart („bei MAN nach Gesellschaft und Werk fragen").
+
+Ein Kundendatensatz trägt außerdem Branche und die anonymisierte Beschreibung.
+Beim Zuordnen werden daraus drei Fakten vorbelegt — der Name intern, Branche
+und Anonymisierung öffentlich.
 
 ## Starten
 
@@ -82,7 +101,8 @@ läuft alles außer Interview, Formulieren, Import und Lernmodus.
 | `docs/05-interview-und-prompts.md` | Interviewführung, Prompt-Aufbau, Lernmodus | aktuell |
 | `docs/06-referenz-website.md` | wie eine Erfolgsgeschichte auf mybits.de aussieht | aktuell |
 | `server/src/db/` | Datenbank, Fakten, Fassungen, Vorlagen | aktuell |
-| `server/src/ki/` | Anbieter, Prompts, Interview, Formulierung, Import, Lernmodus | aktuell |
+| `server/src/ki/` | Anbieter, Prompts, Interview, Formulierung, Import, Lernmodus, Eingabehilfen | aktuell |
+| `server/src/api/strom.ts` | Ereignisstrom für die Fortschrittsanzeige | aktuell |
 | `server/src/api/` | HTTP-Server und Handler | aktuell |
 | `server/src/seed/` | Faktenkatalog, Ziele, Projektarten (Erstausstattung) | aktuell |
 | `server/test/kern.test.ts` | Tests der Invarianten | aktuell |
@@ -95,10 +115,12 @@ Mitgeliefert und in der Verwaltung änderbar:
 - **30 Faktenrubriken** in neun Gruppen, davon **13 Pflicht** — abgeleitet aus
   der Feldstruktur der Website (`docs/06-referenz-website.md`).
 - **4 Ziele**: Website, Interne Kundenreferenz, Mitarbeiter-CV, Angebot/Pitch.
-- **7 Projektarten**: KI-Projekt, Cloud und Infrastruktur,
+- **6 Projektarten**: KI-Projekt, Cloud und Infrastruktur,
   Individualentwicklung, Systemintegration und Daten, Beratung und Prozesse,
-  Internes Projekt, Projekt bei MAN (als Beispiel für kundenspezifisches
-  Wissen).
+  Internes Projekt.
+- **1 Kunde als Muster**: MAN — er zeigt, welche Art von Wissen in einen
+  Kundendatensatz gehört. Die echten Kunden trägt ein, wer mit ihnen
+  arbeitet.
 
 ## Was gemessen ist
 
@@ -120,12 +142,38 @@ Mitgeliefert und in der Verwaltung änderbar:
 - Im Browser durchgesehen: Startseite, Arbeitsbereich mit beiden Reitern,
   Verwaltung. Fünf Befunde gefunden und behoben (`docs/04-aenderungen.md`).
 
+### Mit echter KI gemessen (17.09.2026)
+
+An der Zendesk-Erfolgsgeschichte von mybits.de:
+
+| Schritt | Dauer | Ergebnis |
+|---|---|---|
+| Import per URL | 87 s | 75 Fakten erkannt, 70 gespeichert |
+| Fassung „Website" | 61 s | 5724 Zeichen aus 65 freigegebenen Fakten |
+| Fassung „Interne Kundenreferenz" | 61 s | 7231 Zeichen aus 72 Fakten |
+| Interviewschritt | 10–13 s | 6 Fakten aus einer Antwort |
+| Frage zerlegen | 5 s | 3 Teilfragen, darunter die Belegfrage |
+| Antwort vorschlagen | 6 s | 5 geratene Angaben, alle markiert |
+
+**Der Kern hält:** Derselbe Bestand, zwei Ziele — der Kundenname „LuckyChef
+GmbH" steht in der internen Fassung im Titel und fehlt in der Website-Fassung
+vollständig. Nicht weil der Prompt es verbietet, sondern weil der Fakt nicht
+mitgeschickt wurde.
+
+Nebenbei fand die Lückenanalyse einen **Widerspruch in der Live-Website**: Die
+Einleitung der Geschichte nennt ein E-Commerce-Unternehmen, Metazeile und
+Kicker nennen „Hotellerie & Reisen".
+
 ## Offene Punkte
 
-- **Kein Durchlauf mit echter KI.** Es ist kein API-Schlüssel hinterlegt, und
-  Zugangsdaten werden hier nicht eingegeben. Interview, Formulieren, Import und
-  Lernmodus sind gebaut und typgeprüft, aber ungemessen — der erste echte Lauf
-  ist eine Messung, kein Vertrauen.
+- **Ein Interview von Anfang bis Ende** ist noch nicht durchgespielt — gemessen
+  sind einzelne Schritte auf einem importierten Bestand. Der Durchlauf mit
+  einem Kollegen und einem Projekt, das nur er kennt, ist der nächste (A-01).
+- **Editor-Werkzeugleiste** (fett, Überschrift, Liste, Lücke) im Browser nicht
+  verifiziert: Die Browsersteuerung erreicht ein `contenteditable` nicht
+  zuverlässig (A-03). Von Hand in einer Minute geprüft.
+- **Der Lernmodus** ist gebaut und typgeprüft, aber noch nicht mit echter KI
+  gelaufen.
 - **Einzelplatz oder Server für alle?** (`O-01`) Heute lokal, ein Nutzer, der
   Schlüssel in der Datenbankdatei. Für „alle Kollegen" braucht es Anmeldung und
   einen Schlüsselspeicher. Das ist eine Entscheidung, keine Technikfrage.

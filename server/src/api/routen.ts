@@ -10,20 +10,31 @@ import {
   story, storyAendern, storyAnlegen, storyLoeschen, storys, verlauf,
 } from '../db/story.ts';
 import {
-  projektarten, projektartSpeichern, struktur, ziel, ziele, zielSpeichern,
+  kunde, kunden, kundeSpeichern, projektarten, projektartSpeichern, struktur,
+  ziel, ziele, zielSpeichern,
 } from '../db/vorlagen.ts';
 import { anzeige, lesen, SCHLUESSEL, setzen } from '../db/einstellung.ts';
 import { lernnotizen, lernnotizUebernehmen, lernnotizVerwerfen } from '../db/lernen.ts';
-import { anbieter, klientVerwerfen, modell, zugangVorhanden } from '../ki/anbieter.ts';
+import {
+  anbieter, fehlerText, klientVerwerfen, modell, zugangVorhanden,
+} from '../ki/anbieter.ts';
 import { interviewSchritt } from '../ki/interview.ts';
 import { formulieren, textUmformulieren } from '../ki/formulierung.ts';
 import { importieren } from '../ki/importieren.ts';
 import { auswerten } from '../ki/lernmodus.ts';
+import { beispielantwort, zerlegen } from '../ki/hilfe.ts';
+import { stromOeffnen } from './strom.ts';
 
 export interface Kontext {
   params: Record<string, string>;
   query: URLSearchParams;
   body: Record<string, unknown>;
+  /**
+   * Die rohe Antwort - nur fuer Endpunkte, die selbst schreiben
+   * (Ereignisstrom). Alle anderen Handler geben Daten zurueck und lassen den
+   * Server antworten.
+   */
+  antwort?: import('node:http').ServerResponse;
 }
 
 const nr = (k: Kontext, name: string) => Number(k.params[name]);
@@ -53,6 +64,7 @@ export function start(_k: Kontext) {
   return {
     storys: storys(),
     projektarten: projektarten(),
+    kunden: kunden(),
     ziele: ziele().map((z) => ({
       id: z.id, schluessel: z.schluessel, name: z.name,
       beschreibung: z.beschreibung, stufe: z.stufe,
@@ -70,12 +82,45 @@ export function storyListe(k: Kontext) {
 
 export function storyNeu(k: Kontext) {
   const arbeitstitel = pflicht(k, 'arbeitstitel');
+  const kundeId = k.body.kunde_id ? Number(k.body.kunde_id) : null;
   const id = storyAnlegen({
     arbeitstitel,
     projektart_id: k.body.projektart_id ? Number(k.body.projektart_id) : null,
+    kunde_id: kundeId,
     autor: text(k, 'autor') ?? lesen(SCHLUESSEL.ichBin),
   });
+  kundenfaktenSetzen(id, kundeId);
   return { id, ...storyVoll({ ...k, params: { id: String(id) } }) };
+}
+
+/**
+ * Aus dem Stammdatensatz die passenden Fakten vorbelegen.
+ *
+ * Die Zuordnung `story.kunde_id` ist eine Steuergroesse (welche Hinweise
+ * gelten), der Kundenname ist Inhalt - und Inhalt steht als Fakt (I-03).
+ * Beides wird deshalb EINMAL beim Zuordnen abgeglichen, nicht dauernd
+ * synchron gehalten: Wer den Fakt danach im Gespraech korrigiert, hat das
+ * letzte Wort.
+ */
+function kundenfaktenSetzen(storyId: number, kundeId: number | null): void {
+  const kd = kunde(kundeId);
+  if (!kd) return;
+  faktSetzen(storyId, {
+    schluessel: 'kunde', wert: kd.name, stufe: 'intern', quelle: 'manuell',
+    beleg: 'Stammdatensatz Kunde',
+  });
+  if (kd.branche) {
+    faktSetzen(storyId, {
+      schluessel: 'branche', wert: kd.branche, stufe: 'oeffentlich', quelle: 'manuell',
+      beleg: 'Stammdatensatz Kunde',
+    });
+  }
+  if (kd.anonym) {
+    faktSetzen(storyId, {
+      schluessel: 'kunde_anonym', wert: kd.anonym, stufe: 'oeffentlich', quelle: 'manuell',
+      beleg: 'Stammdatensatz Kunde',
+    });
+  }
 }
 
 /** Der ganze Arbeitsstand einer Geschichte - das, was der Splitscreen braucht. */
@@ -107,19 +152,25 @@ export function storyVoll(k: Kontext) {
     })),
     katalog: katalog(),
     projektarten: projektarten(),
+    kunden: kunden(),
   };
 }
 
 export function storyPatch(k: Kontext) {
   const id = nr(k, 'id');
+  const kundeNeu = k.body.kunde_id === undefined
+    ? undefined
+    : (k.body.kunde_id ? Number(k.body.kunde_id) : null);
   storyAendern(id, {
     arbeitstitel: text(k, 'arbeitstitel'),
     status: k.body.status as 'aktiv' | 'fertig' | 'archiv' | undefined,
     projektart_id: k.body.projektart_id === undefined
       ? undefined
       : (k.body.projektart_id ? Number(k.body.projektart_id) : null),
+    kunde_id: kundeNeu,
     autor: text(k, 'autor'),
   });
+  if (kundeNeu) kundenfaktenSetzen(id, kundeNeu);
   return { ok: true, story: story(id) };
 }
 
@@ -130,10 +181,55 @@ export function storyWeg(k: Kontext) {
 
 // ------------------------------------------------------------------ Interview
 
+/**
+ * Ein Interviewschritt, als Ereignisstrom.
+ *
+ * Der Handler antwortet selbst: Ein Schritt dauert gemessen 10 bis 13
+ * Sekunden, und in dieser Zeit soll sichtbar sein, dass etwas passiert.
+ * Das Ergebnis kommt am Ende als Ereignis `fertig` - dieselben Daten, die der
+ * Handler sonst zurueckgegeben haette.
+ */
 export async function interview(k: Kontext) {
   const id = nr(k, 'id');
-  const ergebnis = await interviewSchritt(id, text(k, 'text'));
-  return { ...ergebnis, verlauf: verlauf(id), fakten: fakten(id) };
+  const strom = stromOeffnen(k.antwort!);
+  try {
+    const ergebnis = await interviewSchritt(id, text(k, 'text'), strom.melder);
+    strom.fertig({ ...ergebnis, verlauf: verlauf(id), fakten: fakten(id) });
+  } catch (e) {
+    strom.fehler(fehlerText(e));
+  }
+}
+
+/**
+ * Die letzte Frage in Teilfragen zerlegen (Hilfe bei der Eingabe).
+ *
+ * Zerlegen erfindet nichts, es sortiert - deshalb ist das gefahrlos und
+ * landet auch nicht im Verlauf. Die Teilfragen beantwortet der Nutzer in der
+ * Oberflaeche; abgesendet wird eine zusammengesetzte Antwort.
+ */
+export async function frageZerlegen(k: Kontext) {
+  const strom = stromOeffnen(k.antwort!);
+  try {
+    strom.fertig(await zerlegen(nr(k, 'id'), strom.melder));
+  } catch (e) {
+    strom.fehler(fehlerText(e));
+  }
+}
+
+/**
+ * Einen Antwortvorschlag entwerfen.
+ *
+ * Der Vorschlag wird NICHT gesendet, sondern ins Eingabefeld gelegt: Er raet
+ * an den Stellen, die er in eckige Klammern setzt, und geratene Angaben
+ * duerfen nicht ungeprueft als Fakt in den Bestand wandern.
+ */
+export async function frageBeispiel(k: Kontext) {
+  const strom = stromOeffnen(k.antwort!);
+  try {
+    strom.fertig(await beispielantwort(nr(k, 'id'), strom.melder));
+  } catch (e) {
+    strom.fehler(fehlerText(e));
+  }
 }
 
 /** Eine Notiz in den Verlauf schreiben, ohne die KI zu fragen. */
@@ -181,9 +277,17 @@ export function faktWeg(k: Kontext) {
 export async function fassungFormulieren(k: Kontext) {
   const id = nr(k, 'id');
   const zielId = Number(k.body.ziel_id);
-  if (!zielId) throw new Fehlerhaft('Kein Ziel gewählt.');
-  const ergebnis = await formulieren(id, zielId);
-  return { ...ergebnis, fassungen: storyVoll(k).fassungen };
+  const strom = stromOeffnen(k.antwort!);
+  if (!zielId) {
+    strom.fehler('Kein Ziel gewählt.');
+    return;
+  }
+  try {
+    const ergebnis = await formulieren(id, zielId, strom.melder);
+    strom.fertig({ ...ergebnis, fassungen: storyVoll(k).fassungen });
+  } catch (e) {
+    strom.fehler(fehlerText(e));
+  }
 }
 
 /** Von Hand gespeichert - setzt `handisch` (I-02). */
@@ -231,19 +335,39 @@ export function zielStruktur(k: Kontext) {
 export async function importieren_(k: Kontext) {
   const url = text(k, 'url')?.trim();
   const inhalt = text(k, 'text')?.trim();
-  if (!url && !inhalt) throw new Fehlerhaft('Weder Text noch Adresse angegeben.');
-  return importieren({
-    url, text: inhalt,
-    arbeitstitel: text(k, 'arbeitstitel'),
-    projektart_id: k.body.projektart_id ? Number(k.body.projektart_id) : null,
-    autor: text(k, 'autor') ?? lesen(SCHLUESSEL.ichBin),
-  });
+  const strom = stromOeffnen(k.antwort!);
+  if (!url && !inhalt) {
+    strom.fehler('Weder Text noch Adresse angegeben.');
+    return;
+  }
+  try {
+    const ergebnis = await importieren({
+      url,
+      text: inhalt,
+      arbeitstitel: text(k, 'arbeitstitel'),
+      projektart_id: k.body.projektart_id ? Number(k.body.projektart_id) : null,
+      kunde_id: k.body.kunde_id ? Number(k.body.kunde_id) : null,
+      autor: text(k, 'autor') ?? lesen(SCHLUESSEL.ichBin),
+    }, strom.melder);
+    if (k.body.kunde_id) kundenfaktenSetzen(ergebnis.story_id, Number(k.body.kunde_id));
+    strom.fertig(ergebnis);
+  } catch (e) {
+    strom.fehler(fehlerText(e));
+  }
 }
 
 // ------------------------------------------------------------------- Lernmodus
 
 export async function lernenAuswerten(k: Kontext) {
-  return auswerten(nr(k, 'id'), k.body.ziel_id ? Number(k.body.ziel_id) : null);
+  const strom = stromOeffnen(k.antwort!);
+  try {
+    const ergebnis = await auswerten(
+      nr(k, 'id'), k.body.ziel_id ? Number(k.body.ziel_id) : null, strom.melder,
+    );
+    strom.fertig(ergebnis);
+  } catch (e) {
+    strom.fehler(fehlerText(e));
+  }
 }
 
 export function lernListe(k: Kontext) {
@@ -264,8 +388,15 @@ export function lernVerwerfen(k: Kontext) {
 // ------------------------------------------------------------- Textwerkzeug
 
 export async function umformulieren(k: Kontext) {
-  const neu = await textUmformulieren(pflicht(k, 'text'), pflicht(k, 'auftrag'));
-  return { text: neu };
+  const strom = stromOeffnen(k.antwort!);
+  try {
+    const neu = await textUmformulieren(
+      pflicht(k, 'text'), pflicht(k, 'auftrag'), strom.melder,
+    );
+    strom.fertig({ text: neu });
+  } catch (e) {
+    strom.fehler(fehlerText(e));
+  }
 }
 
 // ------------------------------------------------------------------ Verwaltung
@@ -274,6 +405,7 @@ export function verwaltung(_k: Kontext) {
   return {
     ziele: ziele(false),
     projektarten: projektarten(false),
+    kunden: kunden(false),
     katalog: alle('SELECT * FROM faktenrubrik ORDER BY sort, id'),
     einstellungen: anzeige(),
     ki: { zugang: zugangVorhanden(), anbieter: anbieter(), modell: modell() },
@@ -310,6 +442,20 @@ export function projektartSpeichern_(k: Kontext) {
     aktiv: k.body.aktiv === undefined ? 1 : (k.body.aktiv ? 1 : 0),
   });
   return { id, projektarten: projektarten(false) };
+}
+
+export function kundeSpeichern_(k: Kontext) {
+  const id = kundeSpeichern({
+    id: k.body.id ? Number(k.body.id) : undefined,
+    name: pflicht(k, 'name'),
+    branche: text(k, 'branche') ?? null,
+    hinweise: text(k, 'hinweise') ?? null,
+    anonym: text(k, 'anonym') ?? null,
+    lernmodus: k.body.lernmodus === undefined ? 1 : (k.body.lernmodus ? 1 : 0),
+    sort: Number(k.body.sort ?? 0),
+    aktiv: k.body.aktiv === undefined ? 1 : (k.body.aktiv ? 1 : 0),
+  });
+  return { id, kunden: kunden(false) };
 }
 
 export function katalogSpeichern(k: Kontext) {

@@ -302,17 +302,40 @@ export const PROJEKTARTEN: ProjektartVorgabe[] = [
 - Interne Projekte eignen sich besonders für die Website, weil es keine
   Kundenfreigabe braucht — darauf hinweisen, wenn es passt.`,
   },
+];
+
+export interface KundeVorgabe {
+  name: string;
+  branche: string;
+  anonym: string;
+  hinweise: string;
+}
+
+/**
+ * Kunden als Stammdaten (E-14).
+ *
+ * Ein Kunde ist eine eigene Achse, keine Projektart: Dieselbe Projektart
+ * kommt bei vielen Kunden vor, und was man bei einem bestimmten Kunden fragen
+ * muss, gilt dort für jede Projektart. Im Interview werden beide Hinweistexte
+ * kombiniert.
+ *
+ * Mitgeliefert ist ein einziger Eintrag als Muster. Die echten Kunden trägt
+ * ein: wer mit ihnen arbeitet.
+ */
+export const KUNDEN: KundeVorgabe[] = [
   {
-    name: 'Projekt bei MAN',
-    beschreibung: 'Beispiel für eine kundenspezifische Projektart. Sammelt, was bei '
-      + 'diesem Kunden immer wieder gebraucht wird.',
-    hinweise: `- Diese Projektart ist ein BEISPIEL für kundenspezifisches Wissen. Die
-  Hinweise hier sind Platzhalter und werden im Lernmodus durch echte ersetzt.
+    name: 'MAN',
+    branche: 'Automotive & Zulieferer',
+    anonym: 'ein internationaler Nutzfahrzeughersteller',
+    hinweise: `- Dieser Eintrag ist das MUSTER für einen Kundendatensatz. Er zeigt,
+  welche Art von Wissen hier hingehört; die Angaben sind Platzhalter und
+  werden im Lernmodus oder von Hand durch echte ersetzt.
 - Nach der Gesellschaft und dem Werk fragen — „MAN" allein ist zu grob.
 - Nach dem Lastenheft fragen: Stand, Version, wer es verantwortet.
 - Nach den Vorgaben des Konzerns fragen (IT-Standards, Freigabeprozesse,
   Lieferantenportal).
 - Nach dem Ansprechpartner und seiner Rolle fragen — bei Konzernen ist die
-  Beziehung die Referenz.`,
+  Beziehung die Referenz.
+- Vor einer Veröffentlichung klären, ob eine Referenzfreigabe vorliegt.`,
   },
 ];

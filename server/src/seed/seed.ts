@@ -8,7 +8,7 @@
 //   npm run seed -- --ersetzen  Vorlagen auf den Lieferstand zuruecksetzen
 import { alle, datenbank, eine, schreib } from '../db/index.ts';
 import { KATALOG } from './katalog.ts';
-import { PROJEKTARTEN, ZIELE } from './ziele.ts';
+import { KUNDEN, PROJEKTARTEN, ZIELE } from './ziele.ts';
 
 const ersetzen = process.argv.includes('--ersetzen');
 
@@ -90,11 +90,36 @@ function projektartenEinspielen(): { neu: number; ersetzt: number } {
   return { neu, ersetzt };
 }
 
+function kundenEinspielen(): { neu: number; ersetzt: number } {
+  let neu = 0;
+  let ersetzt = 0;
+  KUNDEN.forEach((k, i) => {
+    const da = eine<{ id: number }>('SELECT id FROM kunde WHERE name = ?', k.name);
+    if (da && !ersetzen) return;
+    if (da) {
+      schreib(
+        `UPDATE kunde SET branche = ?, anonym = ?, hinweise = ?, sort = ?, aktiv = 1
+          WHERE id = ?`,
+        k.branche, k.anonym, k.hinweise, i * 10, da.id,
+      );
+      ersetzt += 1;
+      return;
+    }
+    schreib(
+      'INSERT INTO kunde (name, branche, anonym, hinweise, lernmodus, sort) VALUES (?,?,?,?,1,?)',
+      k.name, k.branche, k.anonym, k.hinweise, i * 10,
+    );
+    neu += 1;
+  });
+  return { neu, ersetzt };
+}
+
 export function seed(): void {
   datenbank();
   const k = katalogEinspielen();
   const z = zieleEinspielen();
   const p = projektartenEinspielen();
+  const ku = kundenEinspielen();
 
   console.log('Erstausstattung eingespielt:');
   console.log(`  Faktenkatalog: ${k.neu} neu, ${k.ersetzt} ersetzt `
@@ -103,7 +128,9 @@ export function seed(): void {
     + `(im Bestand: ${alle('SELECT id FROM ziel').length})`);
   console.log(`  Projektarten:  ${p.neu} neu, ${p.ersetzt} ersetzt `
     + `(im Bestand: ${alle('SELECT id FROM projektart').length})`);
-  if (!ersetzen && (k.neu + z.neu + p.neu === 0)) {
+  console.log(`  Kunden:        ${ku.neu} neu, ${ku.ersetzt} ersetzt `
+    + `(im Bestand: ${alle('SELECT id FROM kunde').length})`);
+  if (!ersetzen && (k.neu + z.neu + p.neu + ku.neu === 0)) {
     console.log('  Nichts zu tun. Mit --ersetzen den Lieferstand wiederherstellen.');
   }
 }

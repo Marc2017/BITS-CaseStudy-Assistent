@@ -2,7 +2,7 @@
 // Erfolgsgeschichte aufnehmen.
 import { useState } from 'react';
 import { api, datum, type Startdaten } from '../lib/api.ts';
-import { Denkt, Fehlerbalken, Kasten } from './teile.tsx';
+import { Arbeitsanzeige, Fehlerbalken, Kasten, useFortgang } from './teile.tsx';
 
 type Weg = null | 'neu' | 'import';
 
@@ -135,6 +135,7 @@ function NeuKasten(
 ) {
   const [titel, setTitel] = useState('');
   const [art, setArt] = useState<string>('');
+  const [kunde, setKunde] = useState<string>('');
   const [laeuft, setLaeuft] = useState(false);
 
   const anlegen = async () => {
@@ -144,6 +145,7 @@ function NeuKasten(
       const r = await api.storyNeu({
         arbeitstitel: titel.trim(),
         projektart_id: art ? Number(art) : null,
+        kunde_id: kunde ? Number(kunde) : null,
       });
       fertig(r.id);
     } catch (e) {
@@ -191,9 +193,21 @@ function NeuKasten(
               ))}
             </select>
           </label>
+          <label className="zeile">
+            <span>Kunde</span>
+            <select className="feld" value={kunde} onChange={(e) => setKunde(e.target.value)}>
+              <option value="">— noch offen, oder internes Projekt —</option>
+              {daten.kunden.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.name}{k.branche ? ` — ${k.branche}` : ''}
+                </option>
+              ))}
+            </select>
+          </label>
           <p className="hinweis">
-            Die Projektart steuert, worauf der Assistent im Interview besonders achtet.
-            Sie lässt sich später ändern.
+            Projektart und Kunde steuern gemeinsam, worauf der Assistent im Interview
+            achtet: die Art sagt, was bei diesem Typ Vorhaben zu fragen ist, der Kunde,
+            was bei diesem Auftraggeber gilt. Beides lässt sich später ändern.
           </p>
         </>
       )}
@@ -210,7 +224,9 @@ function ImportKasten(
   const [text, setText] = useState('');
   const [titel, setTitel] = useState('');
   const [art, setArt] = useState('');
+  const [kunde, setKunde] = useState('');
   const [laeuft, setLaeuft] = useState(false);
+  const { stand, fortgang } = useFortgang();
 
   const los = async () => {
     setLaeuft(true);
@@ -220,7 +236,8 @@ function ImportKasten(
         text: modus === 'text' ? text : undefined,
         arbeitstitel: titel.trim() || undefined,
         projektart_id: art ? Number(art) : null,
-      });
+        kunde_id: kunde ? Number(kunde) : null,
+      }, fortgang);
       fertig(r.story_id);
     } catch (e) {
       fehler(e instanceof Error ? e.message : String(e));
@@ -305,6 +322,15 @@ function ImportKasten(
                 ))}
               </select>
             </label>
+            <label className="zeile">
+              <span>Kunde</span>
+              <select className="feld" value={kunde} onChange={(e) => setKunde(e.target.value)}>
+                <option value="">— noch offen —</option>
+                {daten.kunden.map((k) => (
+                  <option key={k.id} value={k.id}>{k.name}</option>
+                ))}
+              </select>
+            </label>
           </div>
 
           <p className="hinweis">
@@ -313,7 +339,12 @@ function ImportKasten(
             die Fakten die Quelle „import", und der Assistent fragt anschließend die
             Lücken ab.
           </p>
-          {laeuft && <Denkt text="Das dauert bei einer langen Geschichte eine Minute." />}
+          {laeuft && (
+            <Arbeitsanzeige
+              stand={stand}
+              text="liest den Text und zieht die Fakten heraus …"
+            />
+          )}
         </>
       )}
     />

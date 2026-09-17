@@ -7,6 +7,7 @@
 // ein Verlaufseintrag, der sagt, woher es kommt.
 import { z } from 'zod';
 import { frageJson } from './anbieter.ts';
+import { STILL, type Melder } from '../api/strom.ts';
 import { EXTRAKTOR } from './prompts.ts';
 import { katalogText } from './prompts.ts';
 import { faktSetzen, fortschritt, katalog } from '../db/fakten.ts';
@@ -112,9 +113,11 @@ export async function importieren(e: {
   url?: string;
   arbeitstitel?: string;
   projektart_id?: number | null;
+  kunde_id?: number | null;
   autor?: string | null;
-}): Promise<ImportErgebnis> {
+}, melder: Melder = STILL): Promise<ImportErgebnis> {
   const quelle = e.url?.trim() || 'eingefügter Text';
+  if (e.url?.trim()) melder.schritt(`Seite abrufen: ${e.url.trim()}`);
   const text = e.url?.trim() ? await seiteHolen(e.url.trim()) : (e.text ?? '').trim();
 
   if (text.length < 200) {
@@ -123,6 +126,8 @@ export async function importieren(e: {
       + 'Faktenextraktion — bitte den vollständigen Text einfügen.',
     );
   }
+
+  melder.schritt(`${text.length} Zeichen Text — Fakten werden herausgelesen`);
 
   const systemStabil = `${EXTRAKTOR}\n\n${katalogText(katalog())}`;
   const antwort = await frageJson(
@@ -134,9 +139,12 @@ export async function importieren(e: {
       }],
       effort: 'high',
       maxTokens: 20000,
+      melder,
     },
     ImportSchema, 'faktenextraktion',
   );
+
+  melder.schritt(`${antwort.fakten.length} Fakten erkannt — werden gesichert`);
 
   const titel = (e.arbeitstitel?.trim() || antwort.titelvorschlag || 'Importierte Erfolgsgeschichte')
     .slice(0, 160);
@@ -144,6 +152,7 @@ export async function importieren(e: {
   const storyId = storyAnlegen({
     arbeitstitel: titel,
     projektart_id: e.projektart_id ?? null,
+    kunde_id: e.kunde_id ?? null,
     autor: e.autor ?? null,
     herkunft: 'import',
     quelle,

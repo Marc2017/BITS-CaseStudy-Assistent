@@ -16,6 +16,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { lesen, SCHLUESSEL } from '../db/einstellung.ts';
+import { STILL, type Melder } from '../api/strom.ts';
 
 const hier = dirname(fileURLToPath(import.meta.url));
 const ENV_PFAD = join(hier, '..', '..', '..', '.env');
@@ -139,6 +140,12 @@ export interface Auftrag {
   verlauf: Runde[];
   effort?: Effort;
   maxTokens?: number;
+  /**
+   * Wohin der Fortschritt gemeldet wird. Ohne Melder laeuft alles genauso,
+   * nur stumm - Aufrufer ohne offenen Strom (Tests, kuenftige Batchlaeufe)
+   * muessen nichts wissen.
+   */
+  melder?: Melder;
 }
 
 /** Aus unserem Verlauf die Nachrichten der API bauen. */
@@ -152,13 +159,79 @@ function nachrichten(verlauf: Runde[]): Anthropic.MessageParam[] {
   if (!m.length || m[0].role !== 'user') {
     m.unshift({ role: 'user', content: 'Beginne mit dem Interview.' });
   }
+  // Und er muss mit einer Nutzernachricht ENDEN.
+  //
+  // Gemessen am 17.09.2026: Claude Opus 5 lehnt eine Anfrage, deren letzte
+  // Nachricht vom Assistenten stammt, mit 400 ab -- "This model does not
+  // support assistant message prefill". Genau das passiert regelmaessig: nach
+  // einem Import steht die Lueckenfrage des Assistenten am Ende, und der
+  // naechste Interviewschritt laeuft ohne neue Nutzerantwort. Ein
+  // Typfehler war das nicht; ohne echten Aufruf faellt es nicht auf.
+  if (m[m.length - 1].role !== 'user') {
+    m.push({ role: 'user', content: 'Mach weiter: stelle die nächste Frage.' });
+  }
   return m;
 }
 
 // ----------------------------------------------------------------- Anthropic
 
+/**
+ * Die Ereignisse eines Modellstroms an den Melder weitergeben.
+ *
+ * Denkschritte kommen in kleinen Haeppchen; weitergegeben wird erst ein
+ * ganzer Satz. Ohne diesen Puffer waere die Anzeige ein Flackern aus
+ * Halbwoertern, und es gingen Hunderte Meldungen ueber die Leitung.
+ */
+function horchen(strom: unknown, melder: Melder): void {
+  const s = strom as {
+    on(e: 'thinking', f: (delta: string, ganz: string) => void): unknown;
+    on(e: 'text', f: (delta: string, ganz: string) => void): unknown;
+  };
+
+  let rest = '';
+  s.on('thinking', (delta) => {
+    rest += delta;
+    // An Satzenden trennen, sonst an einer Zeilengrenze.
+    const teile = rest.split(/(?<=[.!?:])\s+|\n+/);
+    rest = teile.pop() ?? '';
+    for (const satz of teile) {
+      const t = satz.trim();
+      if (t.length > 2) melder.denkt(t);
+    }
+    // Ein sehr langer Satz ohne Punkt darf nicht ewig haengen.
+    if (rest.length > 220) {
+      melder.denkt(rest.trim());
+      rest = '';
+    }
+  });
+
+  let zeichen = 0;
+  let gemeldet = 0;
+  s.on('text', (delta) => {
+    zeichen += delta.length;
+    // Nicht je Haeppchen melden - alle 200 Zeichen genuegt fuer eine Anzeige.
+    if (zeichen - gemeldet >= 200) {
+      gemeldet = zeichen;
+      melder.ausgabe(zeichen);
+    }
+  });
+}
+
+/**
+ * Strukturierte Antwort, im Strom geholt.
+ *
+ * Gestreamt wird auch dann, wenn niemand zuhoert: Die Denkschritte sind der
+ * einzige ehrliche Fortschrittshinweis, und `messages.parse()` kann nicht
+ * streamen. `finalMessage()` liefert bei strukturierter Ausgabe trotzdem ein
+ * `parsed_output` - das Parsen bleibt also beim SDK.
+ *
+ * `display: 'summarized'` ist Pflicht: Bei Claude Opus 5 ist die Vorgabe
+ * `omitted`, und dann kommen leere Denkbloecke an - die Anzeige waere eine
+ * lange Pause statt einer Meldung.
+ */
 async function anthropicJson<T>(a: Auftrag, schema: z.ZodType<T>): Promise<T> {
-  const antwort = await claude().messages.parse({
+  const melder = a.melder ?? STILL;
+  const strom = claude().messages.stream({
     model: modell(),
     max_tokens: a.maxTokens ?? 16000,
     system: [
@@ -166,17 +239,23 @@ async function anthropicJson<T>(a: Auftrag, schema: z.ZodType<T>): Promise<T> {
       ...(a.systemWechselnd ? [{ type: 'text' as const, text: a.systemWechselnd }] : []),
     ],
     messages: nachrichten(a.verlauf),
+    thinking: { type: 'adaptive', display: 'summarized' },
     output_config: {
       effort: a.effort ?? 'high',
       format: zodOutputFormat(schema),
     },
   });
+
+  horchen(strom, melder);
+  const antwort = await strom.finalMessage();
+
   if (antwort.stop_reason === 'refusal') {
     throw new Error('Die KI hat die Anfrage abgelehnt. Bitte den Text prüfen.');
   }
   if (!antwort.parsed_output) {
     throw new Error('Die KI hat keine verwertbare Antwort geliefert — die Struktur kam leer zurück.');
   }
+  melder.schritt('Antwort vollständig');
   return antwort.parsed_output;
 }
 
@@ -191,8 +270,10 @@ async function anthropicText(a: Auftrag): Promise<string> {
       ...(a.systemWechselnd ? [{ type: 'text' as const, text: a.systemWechselnd }] : []),
     ],
     messages: nachrichten(a.verlauf),
+    thinking: { type: 'adaptive', display: 'summarized' },
     output_config: { effort: a.effort ?? 'xhigh' },
   });
+  horchen(strom, a.melder ?? STILL);
   const antwort = await strom.finalMessage();
   if (antwort.stop_reason === 'refusal') {
     throw new Error('Die KI hat die Anfrage abgelehnt.');
@@ -262,9 +343,15 @@ async function azureJson<T>(a: Auftrag, schema: z.ZodType<T>, name: string): Pro
 export async function frageJson<T>(
   a: Auftrag, schema: z.ZodType<T>, name = 'antwort',
 ): Promise<T> {
-  return anbieter() === 'azure'
-    ? azureJson(a, schema, name)
-    : anthropicJson(a, schema);
+  const melder = a.melder ?? STILL;
+  melder.schritt(`Anfrage an ${anbieter()} (${modell()})`);
+  if (anbieter() === 'azure') {
+    // Azure laeuft ueber einen einzelnen fetch-Aufruf: Dort gibt es keine
+    // Denkschritte zu melden, nur Anfang und Ende.
+    melder.schritt('Azure OpenAI antwortet nicht im Strom — bitte warten');
+    return azureJson(a, schema, name);
+  }
+  return anthropicJson(a, schema);
 }
 
 /** Freie Textantwort (HTML fuer die Fassung). */

@@ -5,6 +5,7 @@
 // sonst noch gibt - und genau das ist der Schutz.
 import { z } from 'zod';
 import { frageJson, frageText, type Runde } from './anbieter.ts';
+import { STILL, type Melder } from '../api/strom.ts';
 import { faktenText, FORMULIERER, strukturText } from './prompts.ts';
 import { faktenFuerZiel, fakten } from '../db/fakten.ts';
 import { fassung, fassungSpeichern, story } from '../db/story.ts';
@@ -28,7 +29,7 @@ export interface FormulierErgebnis extends FassungAntwort {
 }
 
 export async function formulieren(
-  storyId: number, zielId: number,
+  storyId: number, zielId: number, melder: Melder = STILL,
 ): Promise<FormulierErgebnis> {
   const s = story(storyId);
   if (!s) throw new Error(`Erfolgsgeschichte ${storyId} gibt es nicht.`);
@@ -38,6 +39,10 @@ export async function formulieren(
   // I-04: der einzige Weg zu den Fakten einer Fassung.
   const erlaubt = faktenFuerZiel(storyId, z0.stufe);
   const gesamt = fakten(storyId).length;
+  melder.schritt(
+    `${erlaubt.length} von ${gesamt} Fakten sind für „${z0.name}“ freigegeben`
+    + ` (Grenze: ${z0.stufe})`,
+  );
 
   // I-06: lieber nichts als Erfundenes.
   if (erlaubt.length < MINDESTFAKTEN) {
@@ -76,11 +81,19 @@ export async function formulieren(
 
   const runden: Runde[] = [{ rolle: 'nutzer', text: auftrag }];
 
+  melder.schritt(alt?.inhalt
+    ? 'Die bestehende Fassung wird überarbeitet'
+    : 'Die Fassung wird geschrieben');
+
   const antwort = await frageJson(
-    { systemStabil, systemWechselnd: wechselnd, verlauf: runden, effort: 'xhigh', maxTokens: 20000 },
+    {
+      systemStabil, systemWechselnd: wechselnd, verlauf: runden,
+      effort: 'xhigh', maxTokens: 20000, melder,
+    },
     FassungSchema, 'fassung',
   );
 
+  melder.schritt('Fassung sichern');
   const id = fassungSpeichern({
     storyId,
     zielId,
@@ -105,7 +118,7 @@ export async function formulieren(
  * Grundlage hat, darf auch bei „staerker formulieren" nicht dazukommen.
  */
 export async function textUmformulieren(
-  text: string, auftrag: string,
+  text: string, auftrag: string, melder: Melder = STILL,
 ): Promise<string> {
   if (!text.trim()) throw new Error('Kein Text markiert.');
   const systemStabil = [
@@ -123,5 +136,6 @@ export async function textUmformulieren(
     verlauf: [{ rolle: 'nutzer', text: `Anweisung: ${auftrag}\n\nAusschnitt:\n${text}` }],
     effort: 'medium',
     maxTokens: 4000,
+    melder,
   });
 }

@@ -142,3 +142,66 @@ export function promptErgaenzen(id: number, text: string): void {
   const neu = [z.prompt.trim(), `- ${text.trim()}`].filter(Boolean).join('\n');
   schreib('UPDATE ziel SET prompt = ? WHERE id = ?', neu, id);
 }
+
+// --------------------------------------------------------------------- Kunden
+//
+// Ein Kunde ist eine eigene Achse, keine Projektart (E-14): Dieselbe
+// Projektart kommt bei vielen Kunden vor, und was man bei einem bestimmten
+// Kunden fragen muss, gilt dort fuer jede Projektart. Im Interview werden
+// beide Hinweistexte kombiniert.
+
+export interface Kunde {
+  id: number;
+  name: string;
+  branche: string | null;
+  hinweise: string | null;
+  /** Wie der Kunde ohne Namen beschrieben wird - fuer die Website-Fassung. */
+  anonym: string | null;
+  lernmodus: number;
+  sort: number;
+  aktiv: number;
+}
+
+export function kunden(nurAktive = true): Kunde[] {
+  return alle<Kunde>(
+    `SELECT * FROM kunde ${nurAktive ? 'WHERE aktiv = 1' : ''} ORDER BY sort, name`,
+  );
+}
+
+export function kunde(id: number | null): Kunde | undefined {
+  if (!id) return undefined;
+  return eine<Kunde>('SELECT * FROM kunde WHERE id = ?', id);
+}
+
+export function kundeNach(name: string): Kunde | undefined {
+  return eine<Kunde>('SELECT * FROM kunde WHERE name = ?', name);
+}
+
+export function kundeSpeichern(e: Partial<Kunde> & { name: string }): number {
+  const vorhanden = e.id ? kunde(e.id) : kundeNach(e.name);
+  if (vorhanden) {
+    schreib(
+      `UPDATE kunde SET name = ?, branche = ?, hinweise = ?, anonym = ?,
+          lernmodus = ?, sort = ?, aktiv = ? WHERE id = ?`,
+      e.name, e.branche ?? vorhanden.branche, e.hinweise ?? vorhanden.hinweise,
+      e.anonym ?? vorhanden.anonym, e.lernmodus ?? vorhanden.lernmodus,
+      e.sort ?? vorhanden.sort, e.aktiv ?? vorhanden.aktiv, vorhanden.id,
+    );
+    return vorhanden.id;
+  }
+  const { id } = schreib(
+    `INSERT INTO kunde (name, branche, hinweise, anonym, lernmodus, sort, aktiv)
+     VALUES (?,?,?,?,?,?,?)`,
+    e.name, e.branche ?? null, e.hinweise ?? null, e.anonym ?? null,
+    e.lernmodus ?? 1, e.sort ?? 0, e.aktiv ?? 1,
+  );
+  return id;
+}
+
+/** Hinweise ergaenzen - der Weg fuer eine uebernommene Lernnotiz (E-07). */
+export function kundenHinweisErgaenzen(id: number, text: string): void {
+  const k = kunde(id);
+  if (!k) return;
+  const neu = [k.hinweise?.trim(), `- ${text.trim()}`].filter(Boolean).join('\n');
+  schreib('UPDATE kunde SET hinweise = ? WHERE id = ?', neu, id);
+}

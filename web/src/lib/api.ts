@@ -4,6 +4,10 @@
 // Statuscode. Hier wird daraus eine Ausnahme mit lesbarem Text - die
 // Oberflaeche zeigt sie unveraendert an, statt "Fehler beim Laden".
 
+import { strom, type Fortgang } from './strom.ts';
+
+export type { Fortgang } from './strom.ts';
+
 export type Stufe = 'oeffentlich' | 'intern' | 'vertraulich';
 
 export interface Fakt {
@@ -57,6 +61,18 @@ export interface Projektart {
   aktiv: number;
 }
 
+export interface Kunde {
+  id: number;
+  name: string;
+  branche: string | null;
+  hinweise: string | null;
+  /** Wie der Kunde ohne Namen beschrieben wird. */
+  anonym: string | null;
+  lernmodus: number;
+  sort: number;
+  aktiv: number;
+}
+
 export interface Katalogeintrag {
   id: number;
   schluessel: string;
@@ -75,6 +91,8 @@ export interface StoryZeile {
   arbeitstitel: string;
   projektart_id: number | null;
   projektart: string | null;
+  kunde_id: number | null;
+  kunde_name: string | null;
   status: 'aktiv' | 'fertig' | 'archiv';
   autor: string | null;
   herkunft: 'interview' | 'import';
@@ -117,11 +135,13 @@ export interface StoryVoll {
   ziele: ZielMitFreigabe[];
   katalog: Katalogeintrag[];
   projektarten: Projektart[];
+  kunden: Kunde[];
 }
 
 export interface Startdaten {
   storys: StoryZeile[];
   projektarten: Projektart[];
+  kunden: Kunde[];
   ziele: Pick<Ziel, 'id' | 'schluessel' | 'name' | 'beschreibung' | 'stufe'>[];
   ki: { zugang: boolean; anbieter: string; modell: string };
   ich: string | null;
@@ -129,7 +149,7 @@ export interface Startdaten {
 
 export interface Lernnotiz {
   id: number;
-  bezug: 'ziel' | 'projektart' | 'katalog';
+  bezug: 'ziel' | 'projektart' | 'kunde' | 'katalog';
   bezug_id: number | null;
   bezug_name: string | null;
   text: string;
@@ -150,6 +170,7 @@ export interface Einstellung {
 export interface Verwaltungsdaten {
   ziele: Ziel[];
   projektarten: Projektart[];
+  kunden: Kunde[];
   katalog: Katalogeintrag[];
   einstellungen: Einstellung[];
   ki: { zugang: boolean; anbieter: string; modell: string };
@@ -189,19 +210,25 @@ async function ruf<T>(pfad: string, art = 'GET', koerper?: unknown): Promise<T> 
 export const api = {
   start: () => ruf<Startdaten>('/start'),
 
-  storyNeu: (e: { arbeitstitel: string; projektart_id?: number | null; autor?: string | null }) =>
-    ruf<StoryVoll & { id: number }>('/storys', 'POST', e),
+  storyNeu: (e: {
+    arbeitstitel: string;
+    projektart_id?: number | null;
+    kunde_id?: number | null;
+    autor?: string | null;
+  }) => ruf<StoryVoll & { id: number }>('/storys', 'POST', e),
   story: (id: number) => ruf<StoryVoll>(`/storys/${id}`),
   storyPatch: (id: number, e: Record<string, unknown>) =>
     ruf<{ story: StoryZeile }>(`/storys/${id}`, 'PATCH', e),
   storyWeg: (id: number) => ruf<{ ok: true }>(`/storys/${id}`, 'DELETE'),
 
-  interview: (id: number, text?: string) =>
-    ruf<{
+  // --- Die KI-Aufrufe laufen als Ereignisstrom (Fortschritt sichtbar) ---
+
+  interview: (id: number, text: string | undefined, fortgang?: Fortgang) =>
+    strom<{
       frage: string; hinweis: string | null; luecken: string[]; reif: boolean;
       neue_fakten: number; fortschritt: Fortschritt;
       fakten: Fakt[]; verlauf: Nachricht[];
-    }>(`/storys/${id}/interview`, 'POST', { text }),
+    }>(`/storys/${id}/interview`, { text }, fortgang),
 
   faktNeu: (id: number, e: Record<string, unknown>) =>
     ruf<{ fakten: Fakt[]; fortschritt: Fortschritt }>(`/storys/${id}/fakten`, 'POST', e),
@@ -214,11 +241,11 @@ export const api = {
       `/fakten/${faktId}?story=${storyId}`, 'DELETE',
     ),
 
-  formulieren: (id: number, zielId: number) =>
-    ruf<{
+  formulieren: (id: number, zielId: number, fortgang?: Fortgang) =>
+    strom<{
       titel: string; inhalt: string; luecken: string[]; fassung_id: number;
       verwendete_fakten: number; ausgelassene_fakten: number; fassungen: FassungZeile[];
-    }>(`/storys/${id}/fassung`, 'POST', { ziel_id: zielId }),
+    }>(`/storys/${id}/fassung`, { ziel_id: zielId }, fortgang),
   fassungSpeichern: (id: number, zielId: number, e: { titel?: string | null; inhalt: string }) =>
     ruf<{ fassung: FassungZeile }>(`/storys/${id}/fassung/${zielId}`, 'PUT', e),
   fassungVerlauf: (id: number, zielId: number) =>
@@ -230,17 +257,34 @@ export const api = {
       `/storys/${id}/fassung/${zielId}/zurueck`, 'POST', { sicherung_id: sicherungId },
     ),
 
-  importieren: (e: { text?: string; url?: string; arbeitstitel?: string; projektart_id?: number | null }) =>
-    ruf<{ story_id: number; titel: string; fakten: number; luecken: string[] }>(
-      '/import', 'POST', e,
+  importieren: (
+    e: {
+      text?: string; url?: string; arbeitstitel?: string;
+      projektart_id?: number | null; kunde_id?: number | null;
+    },
+    fortgang?: Fortgang,
+  ) =>
+    strom<{ story_id: number; titel: string; fakten: number; luecken: string[] }>(
+      '/import', e, fortgang,
     ),
 
-  umformulieren: (text: string, auftrag: string) =>
-    ruf<{ text: string }>('/text/umformulieren', 'POST', { text, auftrag }),
+  zerlegen: (id: number, fortgang?: Fortgang) =>
+    strom<{
+      frage: string;
+      teilfragen: { frage: string; hinweis: string | null }[];
+    }>(`/storys/${id}/zerlegen`, {}, fortgang),
 
-  auswerten: (id: number, zielId?: number | null) =>
-    ruf<{ angelegt: number; uebersprungen: string | null }>(
-      `/storys/${id}/auswerten`, 'POST', { ziel_id: zielId },
+  beispielantwort: (id: number, fortgang?: Fortgang) =>
+    strom<{ antwort: string; geraten: string[] }>(
+      `/storys/${id}/beispielantwort`, {}, fortgang,
+    ),
+
+  umformulieren: (text: string, auftrag: string, fortgang?: Fortgang) =>
+    strom<{ text: string }>('/text/umformulieren', { text, auftrag }, fortgang),
+
+  auswerten: (id: number, zielId?: number | null, fortgang?: Fortgang) =>
+    strom<{ angelegt: number; uebersprungen: string | null }>(
+      `/storys/${id}/auswerten`, { ziel_id: zielId }, fortgang,
     ),
 
   verwaltung: () => ruf<Verwaltungsdaten>('/verwaltung'),
@@ -248,6 +292,8 @@ export const api = {
     ruf<{ id: number; ziele: Ziel[] }>('/verwaltung/ziele', 'PUT', e),
   projektartSpeichern: (e: Record<string, unknown>) =>
     ruf<{ id: number; projektarten: Projektart[] }>('/verwaltung/projektarten', 'PUT', e),
+  kundeSpeichern: (e: Record<string, unknown>) =>
+    ruf<{ id: number; kunden: Kunde[] }>('/verwaltung/kunden', 'PUT', e),
   katalogSpeichern: (e: Record<string, unknown>) =>
     ruf<{ katalog: Katalogeintrag[] }>('/verwaltung/katalog', 'PUT', e),
   einstellungenSetzen: (e: Record<string, unknown>) =>

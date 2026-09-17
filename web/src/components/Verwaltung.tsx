@@ -4,12 +4,12 @@
 // hier bearbeitbar, ohne dass jemand Code anfassen muss.
 import { useEffect, useState } from 'react';
 import {
-  api, datum, STUFEN, type Katalogeintrag, type Lernnotiz, type Projektart,
-  type Stufe, type Verwaltungsdaten, type Ziel,
+  api, datum, STUFEN, type Katalogeintrag, type Kunde, type Lernnotiz,
+  type Projektart, type Stufe, type Verwaltungsdaten, type Ziel,
 } from '../lib/api.ts';
 import { Fehlerbalken } from './teile.tsx';
 
-type Seite = 'ziele' | 'projektarten' | 'katalog' | 'gelernt' | 'einstellungen';
+type Seite = 'ziele' | 'projektarten' | 'kunden' | 'katalog' | 'gelernt' | 'einstellungen';
 
 export function Verwaltung({ zurueck }: { zurueck: () => void }) {
   const [seite, setSeite] = useState<Seite>('ziele');
@@ -25,6 +25,7 @@ export function Verwaltung({ zurueck }: { zurueck: () => void }) {
   const seiten: { s: Seite; name: string }[] = [
     { s: 'ziele', name: 'Ziele und Vorlagen' },
     { s: 'projektarten', name: 'Projektarten' },
+    { s: 'kunden', name: 'Kunden' },
     { s: 'katalog', name: 'Faktenkatalog' },
     { s: 'gelernt', name: 'Gelernt' },
     { s: 'einstellungen', name: 'Einstellungen' },
@@ -66,6 +67,9 @@ export function Verwaltung({ zurueck }: { zurueck: () => void }) {
           )}
           {daten && seite === 'projektarten' && (
             <Projektarten arten={daten.projektarten} fehler={setFehler} neuLaden={laden} />
+          )}
+          {daten && seite === 'kunden' && (
+            <Kunden liste={daten.kunden} fehler={setFehler} neuLaden={laden} />
           )}
           {daten && seite === 'katalog' && (
             <Katalog eintraege={daten.katalog} fehler={setFehler} neuLaden={laden} />
@@ -460,7 +464,11 @@ function Gelernt(
             {n.begruendung}
           </div>
           <div className="hinweis" style={{ marginTop: 8 }}>
-            Ziel: {n.bezug === 'projektart' ? 'Projektart' : n.bezug === 'ziel' ? 'Ziel' : 'Faktenkatalog'}
+            Ziel: {
+              n.bezug === 'projektart' ? 'Projektart'
+                : n.bezug === 'kunde' ? 'Kunde'
+                  : n.bezug === 'ziel' ? 'Ziel' : 'Faktenkatalog'
+            }
             {n.bezug_name ? ` „${n.bezug_name}"` : ''}
             {n.story_titel ? ` · aus: ${n.story_titel}` : ''}
             {` · ${datum(n.erstellt_am)}`}
@@ -573,5 +581,167 @@ function Einstellungen(
         })}
       </div>
     </>
+  );
+}
+
+// ---------------------------------------------------------------------- Kunden
+
+function Kunden(
+  { liste, fehler, neuLaden }:
+  { liste: Kunde[]; fehler: (t: string) => void; neuLaden: () => void },
+) {
+  const [neu, setNeu] = useState('');
+
+  const anlegen = async () => {
+    if (!neu.trim()) return;
+    try {
+      await api.kundeSpeichern({ name: neu.trim(), hinweise: '', lernmodus: 1 });
+      setNeu('');
+      neuLaden();
+    } catch (e) {
+      fehler(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  return (
+    <>
+      <h2>Kunden</h2>
+      <p className="hinweis">
+        Ein Kunde ist eine eigene Achse, keine Projektart: Dieselbe Projektart kommt bei
+        vielen Kunden vor, und was bei einem bestimmten Auftraggeber gilt, gilt dort für
+        jede Projektart. Im Interview bekommt der Assistent <b>beide</b> Hinweistexte —
+        die der Projektart und die des Kunden.
+      </p>
+      <p className="hinweis" style={{ marginBottom: 20 }}>
+        Wird ein Kunde einer Erfolgsgeschichte zugeordnet, legt das Werkzeug daraus
+        gleich drei Fakten an: den Namen (intern), die Branche und die anonymisierte
+        Beschreibung (beide öffentlich). Korrigieren lassen sie sich danach im Gespräch —
+        die Eingabe im Gespräch hat das letzte Wort.
+      </p>
+
+      <div className="karte">
+        <header><h3>Neuer Kunde</h3></header>
+        <div className="reihe">
+          <input
+            className="feld"
+            value={neu}
+            placeholder="Name des Auftraggebers"
+            onChange={(e) => setNeu(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') anlegen(); }}
+          />
+          <button
+            type="button"
+            className="knopf haupt"
+            style={{ flex: '0 0 auto' }}
+            onClick={anlegen}
+            disabled={!neu.trim()}
+          >
+            Anlegen
+          </button>
+        </div>
+      </div>
+
+      {liste.length === 0 && (
+        <div className="leer">Noch keine Kunden hinterlegt.</div>
+      )}
+      {liste.map((k) => (
+        <KundeKarte key={k.id} kunde={k} fehler={fehler} neuLaden={neuLaden} />
+      ))}
+    </>
+  );
+}
+
+function KundeKarte(
+  { kunde, fehler, neuLaden }:
+  { kunde: Kunde; fehler: (t: string) => void; neuLaden: () => void },
+) {
+  const [branche, setBranche] = useState(kunde.branche ?? '');
+  const [anonym, setAnonym] = useState(kunde.anonym ?? '');
+  const [hinweise, setHinweise] = useState(kunde.hinweise ?? '');
+  const [lernmodus, setLernmodus] = useState(kunde.lernmodus === 1);
+  const [aktiv, setAktiv] = useState(kunde.aktiv === 1);
+  const [gespeichert, setGespeichert] = useState(false);
+
+  const geaendert = branche !== (kunde.branche ?? '')
+    || anonym !== (kunde.anonym ?? '')
+    || hinweise !== (kunde.hinweise ?? '')
+    || lernmodus !== (kunde.lernmodus === 1)
+    || aktiv !== (kunde.aktiv === 1);
+
+  const speichern = async () => {
+    try {
+      await api.kundeSpeichern({
+        id: kunde.id, name: kunde.name, branche, anonym, hinweise,
+        lernmodus: lernmodus ? 1 : 0, sort: kunde.sort, aktiv: aktiv ? 1 : 0,
+      });
+      setGespeichert(true);
+      neuLaden();
+      window.setTimeout(() => setGespeichert(false), 2500);
+    } catch (e) {
+      fehler(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  return (
+    <div className="karte">
+      <header>
+        <h3>{kunde.name}</h3>
+        {!aktiv && <span className="hinweis">ausgeblendet</span>}
+        {gespeichert && <span className="gespeichert">gespeichert</span>}
+        <button type="button" className="knopf haupt" disabled={!geaendert} onClick={speichern}>
+          Speichern
+        </button>
+      </header>
+
+      <div className="reihe">
+        <label className="zeile">
+          <span>Branche</span>
+          <input
+            className="feld"
+            value={branche}
+            placeholder="z. B. Automotive &amp; Zulieferer"
+            onChange={(e) => setBranche(e.target.value)}
+          />
+        </label>
+        <label className="zeile">
+          <span>Anonymisiert zu beschreiben als</span>
+          <input
+            className="feld"
+            value={anonym}
+            placeholder="z. B. ein internationaler Nutzfahrzeughersteller"
+            onChange={(e) => setAnonym(e.target.value)}
+          />
+        </label>
+      </div>
+
+      <label className="zeile">
+        <span>Hinweise für das Interview (gelten bei diesem Kunden für jede Projektart)</span>
+        <textarea
+          className="feld"
+          value={hinweise}
+          placeholder="- Nach der Gesellschaft und dem Werk fragen&#10;- Nach dem Lastenheft fragen: Stand, Version, wer es verantwortet"
+          onChange={(e) => setHinweise(e.target.value)}
+        />
+      </label>
+
+      <div className="reihe" style={{ alignItems: 'center' }}>
+        <label className="schalter">
+          <input
+            type="checkbox"
+            checked={lernmodus}
+            onChange={(e) => setLernmodus(e.target.checked)}
+          />
+          Lernmodus an
+        </label>
+        <label className="schalter">
+          <input
+            type="checkbox"
+            checked={aktiv}
+            onChange={(e) => setAktiv(e.target.checked)}
+          />
+          in der Auswahl zeigen
+        </label>
+      </div>
+    </div>
   );
 }

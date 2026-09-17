@@ -5,7 +5,7 @@ import { api, type StoryVoll } from '../lib/api.ts';
 import { Blatt } from './Blatt.tsx';
 import { Fakten } from './Fakten.tsx';
 import { Gespraech } from './Gespraech.tsx';
-import { Fehlerbalken, Spur } from './teile.tsx';
+import { Arbeitsanzeige, Fehlerbalken, Spur, useFortgang } from './teile.tsx';
 
 export function Arbeit(
   { storyId, kiZugang, zurueck, zurVerwaltung }:
@@ -21,6 +21,8 @@ export function Arbeit(
   const [breite, setBreite] = useState(46);
   const [titel, setTitel] = useState('');
   const [auswertung, setAuswertung] = useState<string | null>(null);
+  const [wertetAus, setWertetAus] = useState(false);
+  const { stand, fortgang, zuruecksetzen } = useFortgang();
 
   const laden = useCallback(async () => {
     try {
@@ -56,8 +58,9 @@ export function Arbeit(
     setLaeuft(true);
     setFehler(null);
     setNeueFakten(0);
+    zuruecksetzen();
     try {
-      const r = await api.interview(storyId, text);
+      const r = await api.interview(storyId, text, fortgang);
       setDaten((d) => (d ? {
         ...d, verlauf: r.verlauf, fakten: r.fakten, fortschritt: r.fortschritt,
       } : d));
@@ -81,8 +84,11 @@ export function Arbeit(
   };
 
   const auswerten = async () => {
+    setWertetAus(true);
+    setAuswertung(null);
+    zuruecksetzen();
     try {
-      const r = await api.auswerten(storyId, zielId);
+      const r = await api.auswerten(storyId, zielId, fortgang);
       setAuswertung(r.uebersprungen
         ?? (r.angelegt
           ? `${r.angelegt} Lernnotiz${r.angelegt === 1 ? '' : 'en'} angelegt — `
@@ -90,6 +96,8 @@ export function Arbeit(
           : 'Nichts gefunden, was der Assistent künftig anders fragen sollte.'));
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
+    } finally {
+      setWertetAus(false);
     }
   };
 
@@ -139,10 +147,36 @@ export function Arbeit(
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
+          <select
+            value={daten.story.kunde_id ?? ''}
+            onChange={async (e) => {
+              await api.storyPatch(storyId, {
+                kunde_id: e.target.value ? Number(e.target.value) : null,
+              });
+              laden();
+            }}
+            aria-label="Kunde"
+            title="Der Kundendatensatz bringt seine eigenen Interview-Hinweise mit."
+            style={{
+              background: 'var(--bg-3)', border: '1px solid var(--line)',
+              borderRadius: 6, padding: '4px 7px', color: 'var(--muted)', fontSize: 12.5,
+            }}
+          >
+            <option value="">Kunde offen</option>
+            {daten.kunden.map((k) => (
+              <option key={k.id} value={k.id}>{k.name}</option>
+            ))}
+          </select>
         </div>
         <Spur stand={daten.fortschritt} neu={neueFakten} />
-        <button type="button" className="knopf leise" onClick={auswerten} title="Lernmodus: auswerten, welche Fragen gefehlt haben">
-          Auswerten
+        <button
+          type="button"
+          className="knopf leise"
+          onClick={auswerten}
+          disabled={wertetAus || laeuft || !kiZugang}
+          title="Lernmodus: auswerten, welche Fragen gefehlt haben"
+        >
+          {wertetAus ? 'Wertet aus …' : 'Auswerten'}
         </button>
         <button type="button" className="knopf leise" onClick={zurVerwaltung}>
           Verwaltung
@@ -172,9 +206,12 @@ export function Arbeit(
             </button>
           </div>
 
-          {(fehler || auswertung) && (
+          {(fehler || auswertung || wertetAus) && (
             <div style={{ padding: '10px 18px 0' }}>
               <Fehlerbalken text={fehler} weg={() => setFehler(null)} />
+              {wertetAus && (
+                <Arbeitsanzeige stand={stand} text="wertet das Gespräch aus …" />
+              )}
               {auswertung && (
                 <p className="hinweis" style={{ color: 'var(--accent-2)' }}>
                   {auswertung}{' '}
@@ -188,6 +225,8 @@ export function Arbeit(
 
           {reiter === 'gespraech' ? (
             <Gespraech
+              storyId={storyId}
+              fehler={setFehler}
               verlauf={daten.verlauf}
               fakten={daten.fakten}
               laeuft={laeuft}
@@ -195,6 +234,7 @@ export function Arbeit(
               reif={reif}
               senden={(t) => schritt(t)}
               beginnen={() => schritt()}
+              stand={stand}
             />
           ) : (
             <Fakten

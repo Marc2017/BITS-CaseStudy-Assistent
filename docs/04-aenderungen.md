@@ -80,3 +80,75 @@ Testautomatisierung erreicht ein `contenteditable` nicht (die synthetische
 Eingabe kam nur teilweise an, der Weg über `execCommand` wurde vom
 Sicherheitsfilter der Browsersteuerung abgelehnt). Das ist in einer Minute von
 Hand geprüft.
+
+---
+
+## 17.09.2026, später — Fortschrittsanzeige, Kunden, Eingabehilfen
+
+Erster Betrieb mit echtem Schlüssel, und drei Wünsche von Marc.
+
+### Der erste echte Durchlauf
+
+Gemessen an der Zendesk-Erfolgsgeschichte von mybits.de:
+
+| Schritt | Dauer | Ergebnis |
+|---|---|---|
+| Import per URL | 87 s | 75 Fakten erkannt, 70 gespeichert (5 Dubletten abgefangen) |
+| Fassung „Website" | 61 s | 5724 Zeichen aus 65 freigegebenen Fakten |
+| Fassung „Interne Kundenreferenz" | 61 s | 7231 Zeichen aus 72 Fakten |
+| Interviewschritt | 10–13 s | 6 Fakten aus einer Antwort, 13/13 Pflichtfakten |
+| Frage zerlegen | 5 s | 3 Teilfragen, darunter die Belegfrage |
+| Antwort vorschlagen | 6 s | 5 geratene Angaben, alle in Klammern |
+
+**Der Kern des Konzepts hält:** Dieselben Fakten, zwei Ziele — „LuckyChef
+GmbH" steht in der internen Fassung im Titel und fehlt in der
+Website-Fassung vollständig. Ebenso die interne Abteilungsangabe. Nicht weil
+der Prompt es verbietet, sondern weil die Fakten gar nicht mitgeschickt wurden
+(I-04).
+
+**Ein Nebenbefund über die Website:** Die Lückenanalyse des Imports meldete
+einen Widerspruch in der Live-Geschichte — die Einleitung nennt ein
+E-Commerce-Unternehmen, Metazeile und Kicker nennen „Hotellerie & Reisen".
+Beides kann nicht stimmen. Das Werkzeug hat also bei seinem ersten echten Lauf
+einen Fehler im Bestand gefunden, den es nicht gesucht hat.
+
+### F-01 — Opus 5 lehnt einen Verlauf ab, der mit dem Assistenten endet
+
+`400 invalid_request_error: This model does not support assistant message
+prefill.` Der Fall tritt regelmäßig auf: Nach einem Import steht die
+Lückenfrage des Assistenten am Ende, und der nächste Interviewschritt läuft
+ohne neue Nutzerantwort.
+
+`nachrichten()` in `ki/anbieter.ts` stellte nur sicher, dass die **erste**
+Nachricht vom Nutzer kommt. Jetzt auch die letzte. Ein Typfehler war das
+nicht, und ohne echten Aufruf fällt es nicht auf — deshalb steht die
+Begründung im Code.
+
+### Fortschrittsanzeige (E-16)
+
+Alle fünf KI-Endpunkte antworten als Ereignisstrom und melden Schritte, die
+Denkschritte des Modells und die Länge der Antwort. Gemessen: 14 Ereignisse in
+einem Interviewschritt, erste Meldung nach 0,0 s, Gedanken nach etwa 3 s.
+
+Zwei Fallen dabei: `messages.parse()` kann nicht streamen (Weg:
+`messages.stream()` mit `output_config.format`, `finalMessage()` liefert
+trotzdem `parsed_output`), und bei Opus 5 ist `thinking.display` per Vorgabe
+`omitted` — ohne `'summarized'` kommen leere Denkblöcke an.
+
+**Befund:** Das Modell dachte auf Englisch. Da die Gedanken angezeigt werden,
+steht die Bitte um Deutsch jetzt in `REDAKTION` und gilt für jeden Prompt.
+
+### Kunden als Stammdaten (E-14, Migration M-2)
+
+„Projekt bei MAN" war als Projektart falsch modelliert. Neue Tabelle `kunde`
+mit eigenen Hinweisen; der Interview-Kontext ist die Kombination aus
+Projektart und Kunde. Die Migration lief an einer Datenbank mit 75 Fakten und
+zwei Fassungen von Stand 1 auf 2, ohne Verlust — das MAN-Wissen zog in den
+Kundendatensatz um, statt gelöscht zu werden.
+
+### Eingabehilfen (E-15)
+
+„Eins nach dem anderen abfragen" und „Antwort vorschlagen". Der Unterschied
+ist dokumentiert, weil er zählt: Zerlegen erfindet nichts, Vorschlagen rät —
+und markiert deshalb jede geratene Angabe in eckigen Klammern, listet sie
+zusätzlich im Klartext und landet im Eingabefeld statt im Gespräch.
