@@ -1,0 +1,21 @@
+# Abhängigkeiten
+node_modules/
+
+# Build-Ausgaben
+web/dist/
+
+# Datenbank und Sicherungen - der echte Bestand des Benutzers
+server/data/*.db
+server/data/*.db-shm
+server/data/*.db-wal
+server/data/backups/
+
+# Zugangsdaten
+.env
+
+# IDE / OS
+.idea/
+.vscode/
+*.log
+Thumbs.db
+.DS_Store

@@ -1,0 +1,17 @@
+{
+  "//": "Typpruefung fuer den Server. Node 24 fuehrt die .ts-Dateien direkt aus, es gibt also keinen Build -- und damit nichts, was einen Typfehler bemerkt. Aufruf: npm run typen. Der Compiler und @types/node liegen unter web/node_modules, damit es keine zweite Paketinstallation braucht.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "noEmit": true,
+    "typeRoots": ["../web/node_modules/@types", "../node_modules/@types"],
+    "types": ["node"]
+  },
+  "include": ["src", "test"]
+}

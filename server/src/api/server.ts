@@ -1,0 +1,169 @@
+// HTTP-Server: JSON-API unter /api/* und das gebaute Frontend als statische
+// Dateien. Kein Framework, node:http genuegt (E-02).
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
+import { readFile, stat } from 'node:fs/promises';
+import { dirname, extname, join, normalize } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { datenbank } from '../db/index.ts';
+import * as r from './routen.ts';
+import { fehlerText } from '../ki/anbieter.ts';
+
+const hier = dirname(fileURLToPath(import.meta.url));
+const WEB_DIST = join(hier, '..', '..', '..', 'web', 'dist');
+const PORT = Number(process.env.PORT ?? 4700);
+
+type Handler = (k: r.Kontext) => unknown;
+interface Route { methode: string; muster: string[]; handler: Handler }
+
+const routen: Route[] = [];
+const fuege = (methode: string, pfad: string, handler: Handler) =>
+  routen.push({ methode, muster: pfad.split('/').filter(Boolean), handler });
+
+// ------------------------------------------------------------------- Routen
+fuege('GET',    '/api/start',                        r.start);
+
+fuege('GET',    '/api/storys',                       r.storyListe);
+fuege('POST',   '/api/storys',                       r.storyNeu);
+fuege('GET',    '/api/storys/:id',                   r.storyVoll);
+fuege('PATCH',  '/api/storys/:id',                   r.storyPatch);
+fuege('DELETE', '/api/storys/:id',                   r.storyWeg);
+
+fuege('POST',   '/api/storys/:id/interview',         r.interview);
+fuege('POST',   '/api/storys/:id/notiz',             r.notiz);
+
+fuege('POST',   '/api/storys/:id/fakten',            r.faktNeu);
+fuege('PATCH',  '/api/fakten/:id',                   r.faktPatch);
+fuege('DELETE', '/api/fakten/:id',                   r.faktWeg);
+
+fuege('POST',   '/api/storys/:id/fassung',           r.fassungFormulieren);
+fuege('PUT',    '/api/storys/:id/fassung/:ziel',     r.fassungHand);
+fuege('GET',    '/api/storys/:id/fassung/:ziel/verlauf', r.fassungVerlauf);
+fuege('POST',   '/api/storys/:id/fassung/:ziel/zurueck', r.fassungZurueck);
+
+fuege('POST',   '/api/import',                       r.importieren_);
+fuege('POST',   '/api/text/umformulieren',           r.umformulieren);
+
+fuege('POST',   '/api/storys/:id/auswerten',         r.lernenAuswerten);
+fuege('GET',    '/api/lernnotizen',                  r.lernListe);
+fuege('POST',   '/api/lernnotizen/:id/uebernehmen',  r.lernUebernehmen);
+fuege('POST',   '/api/lernnotizen/:id/verwerfen',    r.lernVerwerfen);
+
+fuege('GET',    '/api/verwaltung',                   r.verwaltung);
+fuege('PUT',    '/api/verwaltung/ziele',             r.zielSpeichern_);
+fuege('GET',    '/api/verwaltung/ziele/:id',         r.zielStruktur);
+fuege('PUT',    '/api/verwaltung/projektarten',      r.projektartSpeichern_);
+fuege('PUT',    '/api/verwaltung/katalog',           r.katalogSpeichern);
+fuege('GET',    '/api/einstellungen',                r.einstellungenLesen);
+fuege('PUT',    '/api/einstellungen',                r.einstellungenSetzen);
+
+// ------------------------------------------------------------------- Helfer
+
+function passt(muster: string[], teile: string[]): Record<string, string> | null {
+  if (muster.length !== teile.length) return null;
+  const params: Record<string, string> = {};
+  for (let i = 0; i < muster.length; i += 1) {
+    const m = muster[i];
+    if (m.startsWith(':')) params[m.slice(1)] = decodeURIComponent(teile[i]);
+    else if (m !== teile[i]) return null;
+  }
+  return params;
+}
+
+async function koerper(req: IncomingMessage): Promise<Record<string, unknown>> {
+  if (req.method === 'GET' || req.method === 'DELETE') return {};
+  const stuecke: Buffer[] = [];
+  for await (const s of req) stuecke.push(s as Buffer);
+  if (!stuecke.length) return {};
+  const roh = Buffer.concat(stuecke).toString('utf8');
+  if (!roh.trim()) return {};
+  try {
+    const d = JSON.parse(roh);
+    return (d && typeof d === 'object') ? d as Record<string, unknown> : {};
+  } catch {
+    throw new r.Fehlerhaft('Der Anfragekoerper ist kein gueltiges JSON.');
+  }
+}
+
+const TYPEN: Record<string, string> = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2',
+};
+
+/** Das gebaute Frontend ausliefern; unbekannte Pfade bekommen die index.html. */
+async function statisch(pfad: string, res: ServerResponse): Promise<void> {
+  const sicher = normalize(pfad).replace(/^(\.\.[/\\])+/, '');
+  let datei = join(WEB_DIST, sicher === '/' ? 'index.html' : sicher);
+  try {
+    const s = await stat(datei);
+    if (s.isDirectory()) datei = join(datei, 'index.html');
+  } catch {
+    datei = join(WEB_DIST, 'index.html');
+  }
+  try {
+    const inhalt = await readFile(datei);
+    res.writeHead(200, { 'Content-Type': TYPEN[extname(datei)] ?? 'application/octet-stream' });
+    res.end(inhalt);
+  } catch {
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end(
+      'Das Frontend ist nicht gebaut. Im Entwicklungsbetrieb laeuft es unter\n'
+      + 'http://localhost:5273 (npm run web); fuer den Einzelbetrieb erst\n'
+      + '"npm run build" ausfuehren.\n',
+    );
+  }
+}
+
+const server = createServer(async (req, res) => {
+  const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+
+  // Der Entwicklungsserver von Vite laeuft auf einem anderen Port.
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
+  if (!url.pathname.startsWith('/api/')) {
+    await statisch(url.pathname, res);
+    return;
+  }
+
+  const teile = url.pathname.split('/').filter(Boolean);
+  for (const route of routen) {
+    if (route.methode !== req.method) continue;
+    const params = passt(route.muster, teile);
+    if (!params) continue;
+    try {
+      const body = await koerper(req);
+      const daten = await route.handler({ params, query: url.searchParams, body });
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(daten ?? { ok: true }));
+    } catch (e) {
+      const status = e instanceof r.Fehlerhaft ? 400 : 500;
+      const meldung = fehlerText(e);
+      if (status === 500) console.error('Fehler:', e);
+      res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ fehler: meldung }));
+    }
+    return;
+  }
+
+  res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify({ fehler: `Kein Endpunkt fuer ${req.method} ${url.pathname}.` }));
+});
+
+datenbank();
+server.listen(PORT, () => {
+  console.log(`BITS Erfolgsgeschichte-Assistent auf http://localhost:${PORT}`);
+  console.log('  Entwicklungsbetrieb: npm run dev (Backend + Vite)');
+});
