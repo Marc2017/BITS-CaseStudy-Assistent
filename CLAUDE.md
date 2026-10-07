@@ -15,6 +15,7 @@ schreibung für Umlaute in Texten).
 - `docs/04-aenderungen.md` — Änderungs- und Fehlerjournal
 - `docs/05-interview-und-prompts.md` — Interviewführung, Prompt-Aufbau, Lernmodus
 - `docs/06-referenz-website.md` — die kanonische Struktur auf mybits.de
+- `docs/07-betrieb.md` — Container, Harbor, Cluster, Anmeldung
 
 **Pflicht vor jedem Eingriff in die Faktenfilterung oder ins Schema:** die
 Invarianten in `02-datenmodell.md`.
@@ -29,6 +30,18 @@ eine Tatsache.
 Die zweite Falle ist **I-05**: Stufen werden über `STUFEN_RANG` (eine Zahl)
 verglichen, nie über Text. Alphabetisch steht `intern` vor `oeffentlich` — ein
 Zeichenkettenvergleich würde interne Fakten durchlassen.
+
+Im Mehrbenutzerbetrieb kommt **I-08** dazu: Der KI-Zugang wird dort nur aus der
+Umgebung gelesen, und ein Versuch über die Oberfläche wird sichtbar abgewiesen.
+Wer eine neue Einstellung anlegt, die einen Zugang trägt, muss sie in
+`NUR_UMGEBUNG_SCHLUESSEL` eintragen — sonst ließe sie sich im Cluster von
+jedem Angemeldeten ändern.
+
+**Wer einen Endpunkt hinzufügt**, prüft `server/src/auth/waechter.ts`: Die
+Liste `OFFEN` ist abschließend (alles andere braucht eine Anmeldung), und
+`brauchtVerwalter()` entscheidet, was die Verwalterrolle verlangt. Beides ist
+eine Liste und kein Muster — ein Muster gibt beim nächsten Endpunkt unbemerkt
+zu viel frei.
 
 ## Nach der Arbeit nachtragen
 

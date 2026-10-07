@@ -155,13 +155,27 @@ export interface StoryVoll {
   kunden: Kunde[];
 }
 
+/** Wer arbeitet hier, und was darf er (E-19). */
+export interface Ich {
+  mehrbenutzer: boolean;
+  anmeldungMoeglich: boolean;
+  angemeldet: boolean;
+  name: string | null;
+  benutzername: string | null;
+  email: string | null;
+  rollen: string[];
+  verwalter: boolean;
+  verwalterRolle: string;
+}
+
 export interface Startdaten {
   storys: StoryZeile[];
   projektarten: Projektart[];
   kunden: Kunde[];
   ziele: Pick<Ziel, 'id' | 'schluessel' | 'name' | 'beschreibung' | 'stufe'>[];
   ki: { zugang: boolean; anbieter: string; modell: string };
-  ich: string | null;
+  ich: Ich;
+  betrieb: { mehrbenutzer: boolean };
 }
 
 export interface Lernnotiz {
@@ -203,11 +217,31 @@ export class ApiFehler extends Error {
   }
 }
 
+/**
+ * Nicht mehr angemeldet: zur Anmeldung schicken.
+ *
+ * An EINER Stelle, nicht in jedem Aufrufer. Eine abgelaufene Sitzung trifft
+ * sonst irgendeinen Aufruf irgendwo, und der Nutzer sieht „Nicht angemeldet"
+ * als Fehlermeldung statt einer Anmeldeseite.
+ *
+ * Der Rücksprung geht über `window.location`, nicht über fetch: Die
+ * Anmeldeseite von Keycloak gehört ins Fenster, nicht in eine Antwort.
+ */
+function zurAnmeldung(ziel: string): never {
+  window.location.href = ziel;
+  // Der Aufrufer darf nicht weiterlaufen, während der Browser navigiert.
+  throw new ApiFehler('Nicht angemeldet — Sie werden weitergeleitet.', 401);
+}
+
 async function ruf<T>(pfad: string, art = 'GET', koerper?: unknown): Promise<T> {
   const antwort = await fetch(`/api${pfad}`, {
     method: art,
     headers: koerper ? { 'Content-Type': 'application/json' } : undefined,
     body: koerper ? JSON.stringify(koerper) : undefined,
+    // Das Sitzungscookie muss mit. Im Entwicklungsbetrieb läuft die
+    // Oberfläche auf einem anderen Port als die API, und ohne diese Angabe
+    // schickt der Browser kein Cookie.
+    credentials: 'include',
   });
   const roh = await antwort.text();
   let daten: unknown = null;
@@ -217,8 +251,9 @@ async function ruf<T>(pfad: string, art = 'GET', koerper?: unknown): Promise<T> 
     throw new ApiFehler(`Unlesbare Antwort des Servers (${antwort.status}).`, antwort.status);
   }
   if (!antwort.ok) {
-    const meldung = (daten as { fehler?: string } | null)?.fehler
-      ?? `Der Server antwortete mit ${antwort.status}.`;
+    const d = daten as { fehler?: string; anmelden?: string } | null;
+    if (antwort.status === 401 && d?.anmelden) zurAnmeldung(d.anmelden);
+    const meldung = d?.fehler ?? `Der Server antwortete mit ${antwort.status}.`;
     throw new ApiFehler(meldung, antwort.status);
   }
   return daten as T;
@@ -226,6 +261,7 @@ async function ruf<T>(pfad: string, art = 'GET', koerper?: unknown): Promise<T> 
 
 export const api = {
   start: () => ruf<Startdaten>('/start'),
+  ich: () => ruf<Ich>('/ich'),
 
   storyNeu: (e: {
     arbeitstitel: string;

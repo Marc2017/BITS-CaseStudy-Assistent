@@ -179,3 +179,19 @@ CREATE TABLE IF NOT EXISTS lernnotiz (
   erstellt_am TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS lernnotiz_status ON lernnotiz(status, bezug);
+
+-- ----------------------------------------------------------------- Sitzungen
+-- Wer ist angemeldet (E-19). Serverseitig, damit Abmelden sofort wirkt und
+-- die Rollen nachlesbar bleiben. Nur im Mehrbenutzerbetrieb in Gebrauch.
+CREATE TABLE IF NOT EXISTS sitzung (
+  id            TEXT PRIMARY KEY,
+  sub           TEXT NOT NULL,          -- Kennung bei Keycloak
+  name          TEXT NOT NULL,
+  email         TEXT,
+  benutzername  TEXT NOT NULL,
+  rollen        TEXT NOT NULL DEFAULT '[]',
+  erstellt_am   TEXT NOT NULL DEFAULT (datetime('now')),
+  gesehen_am    TEXT NOT NULL DEFAULT (datetime('now')),
+  ablauf        TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sitzung_ablauf ON sitzung(ablauf);

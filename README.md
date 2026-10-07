@@ -6,9 +6,22 @@ formuliert daraus so viele Fassungen, wie gebraucht werden — für die Website,
 als interne Kundenreferenz, als Absatz in einem Profil, als Referenz in einem
 Angebot.
 
-**Stand: 17.09.2026** — Proof of Concept lauffähig und **mit echter KI
-durchgemessen**: Import, Interview, beide Fassungen und die Eingabehilfen
-laufen. Zahlen unter „Was gemessen ist".
+**Stand: 07.10.2026** — Mit echter KI durchgemessen (Import, Interview, beide
+Fassungen, Eingabehilfen) und **betriebsfähig für alle Kollegen**: Container,
+CI/CD nach Harbor, Cluster-Manifeste und Anmeldung über Keycloak mit zwei
+Rollenstufen. Was noch nicht gemessen ist, steht unter „Offene Punkte".
+
+## Zwei Betriebsarten
+
+| | Einzelplatz (Vorgabe) | Mehrbenutzer |
+|---|---|---|
+| Wo | lokal, `npm run dev` | im Cluster, hinter Keycloak |
+| Anmeldung | keine | Pflicht (OIDC, `id.mybits.dev`) |
+| Rollen | keine — einer darf alles | Schreiben für alle Angemeldeten, Verwalten mit Rolle |
+| KI-Schlüssel | Verwaltung oder `.env` | **nur** aus der Umgebung (I-08) |
+
+Umgeschaltet wird mit `BITS_EG_MEHRBENUTZER=1`. Die Handgriffe für den
+Cluster stehen in `docs/07-betrieb.md`.
 
 ---
 
@@ -110,6 +123,11 @@ läuft alles außer Interview, Formulieren, Import und Lernmodus.
 | `server/src/seed/` | Faktenkatalog, Ziele, Projektarten (Erstausstattung) | aktuell |
 | `server/test/kern.test.ts` | Tests der Invarianten | aktuell |
 | `web/src/` | Oberfläche (React, Vite) | aktuell |
+| `server/src/auth/` | OIDC, Sitzungen, Wächter (E-19) | aktuell |
+| `docs/07-betrieb.md` | Container, Harbor, Cluster, Anmeldung | aktuell |
+| `Dockerfile`, `docker-compose.yaml` | ein Image; lokaler Betrieb mit Keycloak | aktuell |
+| `k8s/` | Deployment, Datenträger, Gateway, Konfiguration | aktuell |
+| `.github/workflows/` | Bauen und nach Harbor schieben | aktuell |
 
 ## Erstausstattung
 
@@ -177,9 +195,20 @@ Kicker nennen „Hotellerie & Reisen".
   zuverlässig (A-03). Von Hand in einer Minute geprüft.
 - **Der Lernmodus** ist gebaut und typgeprüft, aber noch nicht mit echter KI
   gelaufen.
-- **Einzelplatz oder Server für alle?** (`O-01`) Heute lokal, ein Nutzer, der
-  Schlüssel in der Datenbankdatei. Für „alle Kollegen" braucht es Anmeldung und
-  einen Schlüsselspeicher. Das ist eine Entscheidung, keine Technikfrage.
+- **Das Image wurde nie gebaut und die Manifeste nie angewandt.** Auf dem
+  Entwicklungsrechner ist kein Docker; geprüft sind Pfade, Syntax und Struktur,
+  nicht der Lauf. Der erste echte Build passiert im Runner.
+- **Der Token-Tausch mit Keycloak ist ungemessen.** Der halbe Weg steht: Die
+  Authorization-URL stimmt (mit PKCE), ein Rücksprung mit falschem `state`
+  oder gefälschtem Cookie wird abgewiesen. Ein echtes Token wurde nie
+  eingelöst.
+- **Das Repository liegt im falschen Account** (`O-07`): Die on-prem-Runner
+  gehören der Organisation `BITS-GmbH`, nicht `Marc2017`. Bis zum Umzug
+  schlägt der Workflow fehl.
+- **Es gibt keine Sicherung** (`O-06`): Die Datenbank liegt auf einem
+  Datenträger im Cluster und wird nirgends hinkopiert.
+- **Liegen vertrauliche Fakten sicher?** (`O-05`) Ist der Cluster-Storage
+  verschlüsselt, und wer kommt an ein PVC? Eine Frage an Florian.
 - **Azure OpenAI ist vorbereitet, aber ungetestet** (`O-04`) — es gibt noch
   keinen Endpunkt.
 - **Wohin der fertige Text geht** (`O-02`): heute kopieren. DOCX-Export oder

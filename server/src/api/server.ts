@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { datenbank } from '../db/index.ts';
 import * as r from './routen.ts';
 import { fehlerText } from '../ki/anbieter.ts';
+import { anmeldeweg, pruefen } from '../auth/waechter.ts';
 
 const hier = dirname(fileURLToPath(import.meta.url));
 const WEB_DIST = join(hier, '..', '..', '..', 'web', 'dist');
@@ -29,6 +30,8 @@ const fuegeStrom = (methode: string, pfad: string, handler: Handler) =>
   routen.push({ methode, muster: pfad.split('/').filter(Boolean), handler, strom: true });
 
 // ------------------------------------------------------------------- Routen
+fuege('GET',    '/api/gesund',                       r.gesund);
+fuege('GET',    '/api/ich',                          r.ich);
 fuege('GET',    '/api/start',                        r.start);
 
 fuege('GET',    '/api/storys',                       r.storyListe);
@@ -137,7 +140,15 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
 
   // Der Entwicklungsserver von Vite laeuft auf einem anderen Port.
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  //
+  // `credentials: 'include'` verlangt eine konkrete Herkunft - mit `*`
+  // schickt der Browser das Sitzungscookie nicht mit. Im Mehrbenutzerbetrieb
+  // laeuft die Oberflaeche ohnehin aus demselben Ursprung; die Ausnahme
+  // gilt nur dem lokalen Vite.
+  const herkunftKopf = req.headers.origin;
+  res.setHeader('Access-Control-Allow-Origin', herkunftKopf ?? '*');
+  if (herkunftKopf) res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   if (req.method === 'OPTIONS') {
@@ -145,6 +156,14 @@ const server = createServer(async (req, res) => {
     res.end();
     return;
   }
+
+  // Die Anmeldewege zuerst: Sie liegen nicht unter /api/ und wuerden sonst
+  // als statische Datei gesucht.
+  if (await anmeldeweg(req, res, url)) return;
+
+  // Der Waechter. Antwortet selbst, wenn die Anfrage nicht durchdarf.
+  const zugang = pruefen(req, res, url.pathname);
+  if (!zugang.durchlassen) return;
 
   if (!url.pathname.startsWith('/api/')) {
     await statisch(url.pathname, res);
@@ -160,6 +179,7 @@ const server = createServer(async (req, res) => {
       const body = await koerper(req);
       const daten = await route.handler({
         params, query: url.searchParams, body, antwort: res,
+        sitzung: zugang.sitzung,
       });
       // Strom-Routen haben selbst geantwortet.
       if (route.strom) return;

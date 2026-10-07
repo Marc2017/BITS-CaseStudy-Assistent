@@ -31,15 +31,23 @@ export async function strom<T>(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(koerper ?? {}),
     signal: abbruch,
+    // Wie in api.ts: ohne das Cookie ist der Aufruf nicht angemeldet.
+    credentials: 'include',
   });
 
-  // Der Server kann auch vor dem Strom scheitern (kein Endpunkt, kaputtes JSON).
+  // Der Server kann auch vor dem Strom scheitern (kein Endpunkt, kaputtes
+  // JSON, abgelaufene Sitzung).
   if (!antwort.ok || !antwort.body) {
     let meldung = `Der Server antwortete mit ${antwort.status}.`;
     try {
-      const d = await antwort.json() as { fehler?: string };
+      const d = await antwort.json() as { fehler?: string; anmelden?: string };
+      if (antwort.status === 401 && d?.anmelden) {
+        window.location.href = d.anmelden;
+        throw new StromFehler('Nicht angemeldet — Sie werden weitergeleitet.');
+      }
       if (d?.fehler) meldung = d.fehler;
-    } catch {
+    } catch (e) {
+      if (e instanceof StromFehler) throw e;
       // Keine JSON-Antwort - dann bleibt die Statusmeldung.
     }
     throw new StromFehler(meldung);

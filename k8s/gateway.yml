@@ -1,0 +1,78 @@
+# Eingang von außen: Istio-Gateway, Zertifikat, Routing.
+#
+# Übernommen aus bits-burn, mit zwei Unterschieden:
+#
+#   1. **Ein Ziel statt zwei.** bits-burn verteilt nach Pfad auf `web` und
+#      `api`; hier liefert derselbe Dienst Oberfläche und API aus, also
+#      braucht es keine Pfadregeln.
+#   2. **HTTP wird auf HTTPS umgeleitet.** Die Anmeldung läuft über ein
+#      Sitzungscookie, und ein Cookie ohne `Secure` über eine offene
+#      Verbindung ist eine Einladung. bits-burn routet HTTP mit durch — das
+#      geht dort, weil die Oberfläche keine Anmeldung trägt.
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: erfolgsgeschichten-ingress-gateway
+  namespace: hackathon-vibe
+spec:
+  selector:
+    istio: ingressgateway-frp
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "erfolgsgeschichten.mybits.dev"
+      tls:
+        httpsRedirect: true
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      tls:
+        mode: SIMPLE
+        credentialName: erfolgsgeschichten-ingress-cert
+      hosts:
+        - "erfolgsgeschichten.mybits.dev"
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: erfolgsgeschichten-ingress-cert
+  # Das Zertifikat gehört in istio-system, nicht in den Namespace der
+  # Anwendung: Dort sucht das Ingress-Gateway seine Secrets.
+  namespace: istio-system
+spec:
+  secretName: erfolgsgeschichten-ingress-cert
+  commonName: "erfolgsgeschichten.mybits.dev"
+  issuerRef:
+    name: letsencrypt-mybits-dev
+    kind: ClusterIssuer
+  dnsNames:
+    - "erfolgsgeschichten.mybits.dev"
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: erfolgsgeschichten-routing
+  namespace: hackathon-vibe
+spec:
+  hosts:
+    - "erfolgsgeschichten.mybits.dev"
+  gateways:
+    - erfolgsgeschichten-ingress-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: erfolgsgeschichten.hackathon-vibe.svc.cluster.local
+            port:
+              number: 80
+      # Ein Import dauert gemessen 87 Sekunden, eine Formulierung 61 — und sie
+      # laufen als Ereignisstrom, der die Verbindung offen hält. Istios
+      # Vorgabe von 15 Sekunden würde jeden dieser Aufrufe mitten im Satz
+      # abschneiden.
+      timeout: 600s

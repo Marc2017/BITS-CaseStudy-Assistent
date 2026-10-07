@@ -1,0 +1,16 @@
+.git
+.gitignore
+node_modules
+web/node_modules
+web/dist
+.env
+docs
+k8s
+*.log
+Thumbs.db
+.DS_Store
+.idea
+.vscode
+
+# Der echte Bestand des Benutzers gehoert nicht ins Image.
+server/data

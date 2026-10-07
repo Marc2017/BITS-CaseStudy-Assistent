@@ -1,0 +1,87 @@
+{
+  "realm": "erfolgsgeschichten",
+  "displayName": "BITS Erfolgsgeschichten (lokal)",
+  "enabled": true,
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "rememberMe": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "roles": {
+    "realm": [
+      {
+        "name": "erfolgsgeschichten-verwalter",
+        "description": "Darf Ziele, Projektarten, Kunden, Faktenkatalog und Einstellungen aendern. Wer die Rolle nicht hat, darf Erfolgsgeschichten schreiben."
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "erfolgsgeschichten",
+      "name": "BITS Erfolgsgeschichte-Assistent",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "nur-fuer-den-lokalen-betrieb",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:4700/auth/callback",
+        "http://127.0.0.1:4700/auth/callback",
+        "http://localhost:5273/auth/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:4700",
+        "http://localhost:5273"
+      ],
+      "baseUrl": "http://localhost:4700",
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:4700/* http://localhost:5273/*"
+      },
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "roles",
+        "profile",
+        "email"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "verwalter",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Vera",
+      "lastName": "Walter",
+      "email": "verwalter@erfolgsgeschichten.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "test",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "erfolgsgeschichten-verwalter"
+      ]
+    },
+    {
+      "username": "kollege",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Kai",
+      "lastName": "Ollege",
+      "email": "kollege@erfolgsgeschichten.local",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "test",
+          "temporary": false
+        }
+      ],
+      "realmRoles": []
+    }
+  ]
+}

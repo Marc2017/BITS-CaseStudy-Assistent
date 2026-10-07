@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 const tempVerzeichnis = mkdtempSync(join(tmpdir(), 'bits-eg-test-'));
 process.env.BITS_EG_DB = join(tempVerzeichnis, 'test.db');
 
-const { datenbank } = await import('../src/db/index.ts');
+const { datenbank, schreib, zahl } = await import('../src/db/index.ts');
 const {
   faktenFuerZiel, faktSetzen, fakten, fortschritt, STUFEN_RANG, stufeOderIntern,
 } = await import('../src/db/fakten.ts');
@@ -24,6 +24,13 @@ const { zielNach } = await import('../src/db/vorlagen.ts');
 const { formulieren } = await import('../src/ki/formulierung.ts');
 const { textAus } = await import('../src/ki/importieren.ts');
 const { seed } = await import('../src/seed/seed.ts');
+const { mehrbenutzer } = await import('../src/db/betrieb.ts');
+const { aenderbar, anzeige, setzen, SCHLUESSEL } = await import('../src/db/einstellung.ts');
+const { zugangVorhanden } = await import('../src/ki/anbieter.ts');
+const {
+  ausCookie, cookieWert, sitzung, sitzungAnlegen, sitzungBeenden,
+} = await import('../src/auth/sitzung.ts');
+const { brauchtVerwalter, istVerwalter } = await import('../src/auth/waechter.ts');
 
 before(() => {
   datenbank();
@@ -209,5 +216,177 @@ describe('Import: Text aus HTML', () => {
     // Herausforderungen ein Fakt.
     const zeilen = text.split('\n').filter((z) => z.trim());
     assert.ok(zeilen.length >= 4, `erwartet mindestens 4 Zeilen, waren ${zeilen.length}`);
+  });
+});
+
+describe('I-08: im Mehrbenutzerbetrieb kommt der KI-Zugang nur aus der Umgebung', () => {
+  // Diese Tests schalten die Betriebsart um und raeumen hinterher auf: Bliebe
+  // das Flag stehen, liefen alle folgenden Tests in einer anderen Betriebsart.
+  const vorher = {
+    mehrbenutzer: process.env.BITS_EG_MEHRBENUTZER,
+    schluessel: process.env.ANTHROPIC_API_KEY,
+  };
+
+  after(() => {
+    if (vorher.mehrbenutzer === undefined) delete process.env.BITS_EG_MEHRBENUTZER;
+    else process.env.BITS_EG_MEHRBENUTZER = vorher.mehrbenutzer;
+    if (vorher.schluessel === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = vorher.schluessel;
+    setzen(SCHLUESSEL.apiKey, null);
+  });
+
+  it('ein Schluessel in der Datenbank wird im Mehrbenutzerbetrieb ignoriert', () => {
+    // Der gefaehrliche Fall: Die Datei kommt aus dem Einzelplatzbetrieb und
+    // bringt einen Schluessel mit. Er darf im Cluster nicht stillschweigend
+    // weiterverwendet werden - niemand wuesste, welcher der beiden gilt.
+    setzen(SCHLUESSEL.apiKey, 'sk-ant-aus-der-datenbank');
+    delete process.env.ANTHROPIC_API_KEY;
+
+    delete process.env.BITS_EG_MEHRBENUTZER;
+    assert.equal(mehrbenutzer(), false);
+    assert.equal(zugangVorhanden(), true, 'am Einzelplatz zaehlt die Datenbank');
+
+    process.env.BITS_EG_MEHRBENUTZER = '1';
+    assert.equal(mehrbenutzer(), true);
+    assert.equal(
+      zugangVorhanden(), false,
+      'im Mehrbenutzerbetrieb darf der Schluessel aus der Datenbank nicht zaehlen',
+    );
+
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-aus-der-umgebung';
+    assert.equal(zugangVorhanden(), true, 'die Umgebung zaehlt');
+  });
+
+  it('die Oberflaeche darf den Zugang im Mehrbenutzerbetrieb nicht setzen', () => {
+    process.env.BITS_EG_MEHRBENUTZER = '1';
+    assert.equal(aenderbar(SCHLUESSEL.apiKey), false);
+    assert.equal(aenderbar(SCHLUESSEL.azureKey), false);
+    assert.equal(aenderbar(SCHLUESSEL.anbieter), false);
+    // Was kein Zugang ist, bleibt aenderbar - sonst waere die Verwaltung tot.
+    assert.equal(aenderbar(SCHLUESSEL.modell), true);
+    assert.equal(aenderbar(SCHLUESSEL.ichBin), true);
+
+    delete process.env.BITS_EG_MEHRBENUTZER;
+    assert.equal(aenderbar(SCHLUESSEL.apiKey), true, 'am Einzelplatz ist alles aenderbar');
+  });
+
+  it('die Anzeige verraet den Wert nicht und meldet die Sperre', () => {
+    process.env.BITS_EG_MEHRBENUTZER = '1';
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-aus-der-umgebung';
+    setzen(SCHLUESSEL.apiKey, 'sk-ant-aus-der-datenbank');
+
+    const zeile = anzeige().find((e) => e.schluessel === SCHLUESSEL.apiKey)!;
+    assert.equal(zeile.gesperrt, true);
+    assert.equal(zeile.gesetzt, true, 'die Umgebung hat einen Wert');
+    assert.equal(zeile.wert, 'aus der Umgebung');
+    assert.ok(
+      !String(zeile.wert).includes('sk-ant'),
+      'auch nicht maskiert: der Wert aus der Datenbank darf nicht auftauchen',
+    );
+  });
+});
+
+describe('E-19: Anmeldung, Sitzung und Rollen', () => {
+  const vorher = {
+    mehrbenutzer: process.env.BITS_EG_MEHRBENUTZER,
+    geheimnis: process.env.SESSION_SECRET,
+    rolle: process.env.BITS_EG_ROLLE_VERWALTER,
+  };
+
+  before(() => {
+    process.env.SESSION_SECRET = 'nur-fuer-den-test-nicht-geheim';
+    process.env.BITS_EG_ROLLE_VERWALTER = 'eg-verwalter';
+  });
+
+  after(() => {
+    for (const [k, v] of Object.entries({
+      BITS_EG_MEHRBENUTZER: vorher.mehrbenutzer,
+      SESSION_SECRET: vorher.geheimnis,
+      BITS_EG_ROLLE_VERWALTER: vorher.rolle,
+    })) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  });
+
+  it('ein gefaelschtes Cookie gilt nicht', () => {
+    const id = sitzungAnlegen({
+      sub: 'abc', name: 'Testperson', email: null, benutzername: 'test',
+      rollen: [], ablauf: Math.floor(Date.now() / 1000) + 3600,
+    });
+
+    const echt = cookieWert(id);
+    assert.equal(ausCookie(echt), id, 'das eigene Cookie wird erkannt');
+
+    // Die Kennung allein genuegt nicht: Ohne gueltige Unterschrift koennte
+    // jemand eine fremde Sitzung uebernehmen, indem er Kennungen durchprobiert.
+    assert.equal(ausCookie(id), null, 'ohne Unterschrift: abgelehnt');
+    assert.equal(ausCookie(`${id}.falsch`), null, 'falsche Unterschrift: abgelehnt');
+    assert.equal(ausCookie(`${id}x.${echt.split('.')[1]}`), null,
+      'veraenderte Kennung bei gueltiger Unterschrift: abgelehnt');
+    assert.equal(ausCookie(undefined), null);
+    assert.equal(ausCookie(''), null);
+
+    sitzungBeenden(id);
+    assert.equal(sitzung(id), null, 'nach dem Abmelden ist die Sitzung weg');
+  });
+
+  it('eine abgelaufene Sitzung wird nicht nur ignoriert, sondern geloescht', () => {
+    const id = sitzungAnlegen({
+      sub: 'abc', name: 'Testperson', email: null, benutzername: 'test',
+      rollen: [], ablauf: Math.floor(Date.now() / 1000) + 3600,
+    });
+    // Ablauf in die Vergangenheit setzen - so, wie es nach zwoelf Stunden
+    // aussieht.
+    schreib("UPDATE sitzung SET ablauf = datetime('now','-1 hour') WHERE id = ?", id);
+    assert.equal(sitzung(id), null);
+    assert.equal(
+      zahl('SELECT COUNT(*) FROM sitzung WHERE id = ?', id), 0,
+      'der Eintrag ist weg, nicht nur unwirksam',
+    );
+  });
+
+  it('die Sitzung endet nie spaeter als das Token', () => {
+    // Ein Token, das in einer Minute ablaeuft, darf keine Sitzung ueber
+    // zwoelf Stunden eroeffnen.
+    const id = sitzungAnlegen({
+      sub: 'abc', name: 'Kurz', email: null, benutzername: 'kurz',
+      rollen: [], ablauf: Math.floor(Date.now() / 1000) + 60,
+    });
+    const s = sitzung(id)!;
+    const uebrig = new Date(s.ablauf).getTime() - Date.now();
+    assert.ok(uebrig <= 61_000, `erwartet hoechstens 61 s, waren ${Math.round(uebrig / 1000)} s`);
+    sitzungBeenden(id);
+  });
+
+  it('nur die Verwalterrolle darf die Verwaltung aendern', () => {
+    process.env.BITS_EG_MEHRBENUTZER = '1';
+    const ohne = {
+      id: 'x', sub: 'a', name: 'Ohne Rolle', email: null, benutzername: 'ohne',
+      rollen: ['irgendwas'], erstellt_am: '', gesehen_am: '', ablauf: '',
+    };
+    const mit = { ...ohne, rollen: ['eg-verwalter'] };
+
+    assert.equal(istVerwalter(ohne), false);
+    assert.equal(istVerwalter(mit), true);
+    assert.equal(istVerwalter(null), false, 'ohne Sitzung: kein Verwalter');
+
+    // Am Einzelplatz gibt es keine Rollen - der eine Mensch darf alles, sonst
+    // kaeme er nicht an seine eigene Verwaltung.
+    delete process.env.BITS_EG_MEHRBENUTZER;
+    assert.equal(istVerwalter(null), true);
+  });
+
+  it('Lesen ist frei, Aendern nicht', () => {
+    assert.equal(brauchtVerwalter('GET', '/api/verwaltung'), false);
+    assert.equal(brauchtVerwalter('GET', '/api/einstellungen'), false);
+    assert.equal(brauchtVerwalter('PUT', '/api/verwaltung/ziele'), true);
+    assert.equal(brauchtVerwalter('PUT', '/api/verwaltung/kunden'), true);
+    assert.equal(brauchtVerwalter('PUT', '/api/einstellungen'), true);
+    // Eine Erfolgsgeschichte schreiben darf jeder Angemeldete - genau das ist
+    // der Zweck des Werkzeugs.
+    assert.equal(brauchtVerwalter('POST', '/api/storys'), false);
+    assert.equal(brauchtVerwalter('POST', '/api/storys/1/interview'), false);
+    assert.equal(brauchtVerwalter('PUT', '/api/storys/1/fassung/1'), false);
   });
 });

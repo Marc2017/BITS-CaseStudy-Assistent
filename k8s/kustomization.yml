@@ -1,0 +1,9 @@
+resources:
+  - config.yml
+  - sealed-secret.yml
+  - app.yml
+  - gateway.yml
+
+images:
+  - name: harbor.mybits.dev/erfolgsgeschichten/app
+    newTag: 0.2.0

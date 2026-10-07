@@ -1,0 +1,69 @@
+# Lokaler Betrieb MIT Anmeldung.
+#
+# Wofuer das gut ist: Der Anmeldeweg (E-19) laesst sich damit pruefen, ohne
+# Zugang zu `id.mybits.dev` zu brauchen. Keycloak kommt mit einem fertigen
+# Realm, zwei Benutzern und der Verwalterrolle.
+#
+#   docker compose up --build
+#   http://localhost:4700
+#
+#   verwalter / test   -> darf alles
+#   kollege   / test   -> darf Erfolgsgeschichten schreiben, nicht verwalten
+#
+# Ohne Anmeldung (Einzelplatz, wie bisher): npm run dev
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      PORT: "4700"
+      BITS_EG_DB: "/app/server/data/erfolgsgeschichten.db"
+
+      # Mehrbenutzerbetrieb: Anmeldung ist Pflicht, und der KI-Schluessel
+      # kommt nur aus der Umgebung (I-08).
+      BITS_EG_MEHRBENUTZER: "1"
+      BITS_EG_ROLLE_VERWALTER: "erfolgsgeschichten-verwalter"
+
+      AUTH_URL: "http://localhost:4700"
+      SESSION_SECRET: "nur-fuer-den-lokalen-betrieb-nicht-uebernehmen"
+
+      KEYCLOAK_REALM: "erfolgsgeschichten"
+      KEYCLOAK_CLIENT_ID: "erfolgsgeschichten"
+      KEYCLOAK_CLIENT_SECRET: "nur-fuer-den-lokalen-betrieb"
+      # Der BROWSER erreicht Keycloak unter localhost, der SERVER im
+      # Compose-Netz unter dem Dienstnamen. Beides ist noetig: Die
+      # Anmeldeseite muss im Browser aufgehen, den Code tauscht der Server.
+      KEYCLOAK_EXTERNAL_BASE_URL: "http://localhost:8080"
+      KEYCLOAK_INTERNAL_BASE_URL: "http://keycloak:8080"
+
+      # Der KI-Zugang kommt aus der Umgebung der eigenen Shell und wird NICHT
+      # in diese Datei geschrieben - sie liegt im Repository.
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+    ports:
+      - "4700:4700"
+    volumes:
+      # Eine eigene Datenbank, nicht die aus server/data: Der echte Bestand
+      # soll nicht in einem Containerversuch landen.
+      - erfolgsgeschichten_daten:/app/server/data
+    depends_on:
+      keycloak:
+        condition: service_started
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.2
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: http://localhost:8080
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./docker/keycloak/realm-import:/opt/keycloak/data/import:ro
+
+volumes:
+  erfolgsgeschichten_daten:

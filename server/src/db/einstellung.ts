@@ -10,6 +10,7 @@
 // vertretbar; sobald mehrere Personen zugreifen (O-01), gehoert er in einen
 // Schluesselspeicher.
 import { alle, eine, schreib } from './index.ts';
+import { mehrbenutzer } from './betrieb.ts';
 
 export const SCHLUESSEL = {
   /** 'anthropic' | 'azure' - welcher Anbieter gefragt wird (E-05). */
@@ -29,6 +30,21 @@ export const SCHLUESSEL = {
   /** Wer sitzt hier? Die ehrliche Vorstufe zur Anmeldung (O-01). */
   ichBin: 'ich.person',
 } as const;
+
+/**
+ * Welche Umgebungsvariable zu welcher Einstellung gehoert.
+ *
+ * Gebraucht, um im Mehrbenutzerbetrieb ehrlich zu melden, ob ein Zugang
+ * vorhanden ist - ohne den Wert zu zeigen.
+ */
+const UMGEBUNG: Record<string, string | undefined> = {
+  [SCHLUESSEL.apiKey]: 'ANTHROPIC_API_KEY',
+  [SCHLUESSEL.azureKey]: 'AZURE_OPENAI_KEY',
+  [SCHLUESSEL.azureEndpunkt]: 'AZURE_OPENAI_ENDPUNKT',
+  [SCHLUESSEL.azureDeployment]: 'AZURE_OPENAI_DEPLOYMENT',
+  [SCHLUESSEL.azureVersion]: 'AZURE_OPENAI_VERSION',
+  [SCHLUESSEL.anbieter]: 'BITS_EG_KI_ANBIETER',
+};
 
 /** Einstellungen, die niemals im Klartext ausgeliefert werden. */
 const GEHEIM = new Set<string>([SCHLUESSEL.apiKey, SCHLUESSEL.azureKey]);
@@ -65,6 +81,23 @@ export interface EinstellungAnzeige {
   wert: string | null;
   geheim: boolean;
   geaendert_am: string | null;
+  /** Im Mehrbenutzerbetrieb: kommt aus der Umgebung, hier nicht aenderbar. */
+  gesperrt: boolean;
+}
+
+/** Welche Schluessel im Mehrbenutzerbetrieb nur aus der Umgebung kommen (I-08). */
+export const NUR_UMGEBUNG_SCHLUESSEL = new Set<string>([
+  SCHLUESSEL.apiKey,
+  SCHLUESSEL.azureKey,
+  SCHLUESSEL.azureEndpunkt,
+  SCHLUESSEL.azureDeployment,
+  SCHLUESSEL.azureVersion,
+  SCHLUESSEL.anbieter,
+]);
+
+/** Darf dieser Schluessel ueber die Oberflaeche gesetzt werden? */
+export function aenderbar(schluessel: string): boolean {
+  return !(mehrbenutzer() && NUR_UMGEBUNG_SCHLUESSEL.has(schluessel));
 }
 
 /** Alle bekannten Schluessel fuer die Oberflaeche - geheime maskiert. */
@@ -77,12 +110,21 @@ export function anzeige(): EinstellungAnzeige[] {
   return Object.values(SCHLUESSEL).map((s) => {
     const z = gespeichert.get(s);
     const geheim = GEHEIM.has(s);
+    const gesperrt = !aenderbar(s);
+    // Bei einem gesperrten Schluessel ist der Wert in der Datenbank
+    // bedeutungslos - er wird nicht benutzt (I-08). Ihn trotzdem als
+    // "gesetzt" zu zeigen, waere eine falsche Auskunft.
+    const umgebungsname = UMGEBUNG[s];
+    const ausUmgebung = umgebungsname ? Boolean(process.env[umgebungsname]?.trim()) : false;
     return {
       schluessel: s,
-      gesetzt: Boolean(z?.wert),
-      wert: geheim ? maskiert(z?.wert ?? null) : (z?.wert ?? null),
+      gesetzt: gesperrt ? ausUmgebung : Boolean(z?.wert),
+      wert: gesperrt
+        ? (ausUmgebung ? 'aus der Umgebung' : null)
+        : (geheim ? maskiert(z?.wert ?? null) : (z?.wert ?? null)),
       geheim,
-      geaendert_am: z?.geaendert_am ?? null,
+      geaendert_am: gesperrt ? null : (z?.geaendert_am ?? null),
+      gesperrt,
     };
   });
 }

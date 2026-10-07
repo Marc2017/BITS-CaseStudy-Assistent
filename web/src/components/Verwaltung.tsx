@@ -4,17 +4,23 @@
 // hier bearbeitbar, ohne dass jemand Code anfassen muss.
 import { useEffect, useState } from 'react';
 import {
-  api, datum, STUFEN, type Katalogeintrag, type Kunde, type Lernnotiz,
-  type Projektart, type Stufe, type Verwaltungsdaten, type Ziel,
+  api, datum, STUFEN, type Ich, type Katalogeintrag, type Kunde,
+  type Lernnotiz, type Projektart, type Stufe, type Verwaltungsdaten,
+  type Ziel,
 } from '../lib/api.ts';
 import { Fehlerbalken } from './teile.tsx';
 
 type Seite = 'ziele' | 'projektarten' | 'kunden' | 'katalog' | 'gelernt' | 'einstellungen';
 
-export function Verwaltung({ zurueck }: { zurueck: () => void }) {
+export function Verwaltung(
+  { zurueck, ich }: { zurueck: () => void; ich?: Ich },
+) {
   const [seite, setSeite] = useState<Seite>('ziele');
   const [daten, setDaten] = useState<Verwaltungsdaten | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
+  // Lesen darf jeder Angemeldete - die Vorlagen zu SEHEN hilft beim
+  // Verstehen, und ohne sie waere die Seite leer. Aendern nur die Verwaltung.
+  const darfAendern = ich?.verwalter ?? true;
 
   const laden = () => {
     api.verwaltung().then(setDaten)
@@ -61,6 +67,17 @@ export function Verwaltung({ zurueck }: { zurueck: () => void }) {
 
         <div className="rolle">
           <Fehlerbalken text={fehler} weg={() => setFehler(null)} />
+          {!darfAendern && (
+            <p className="hinweis" style={{
+              border: '1px solid var(--line-hell)', borderLeft: '3px solid var(--ph)',
+              borderRadius: 6, padding: '10px 12px', marginBottom: 18, maxWidth: '70ch',
+            }}
+            >
+              Sie sehen die Vorlagen, können sie aber nicht ändern: Dafür braucht es die
+              Rolle <code>{ich?.verwalterRolle}</code>. Erfolgsgeschichten schreiben
+              dürfen Sie ohne diese Rolle.
+            </p>
+          )}
           {!daten && 'Lädt …'}
           {daten && seite === 'ziele' && (
             <Ziele ziele={daten.ziele} fehler={setFehler} neuLaden={laden} />

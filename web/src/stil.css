@@ -879,3 +879,18 @@ table.tab td.rechts { text-align: right; white-space: nowrap; }
   flex-wrap: wrap;
 }
 .antwortfeld .unten { gap: 12px; }
+
+/* Wer ist angemeldet (E-19). Nur im Mehrbenutzerbetrieb sichtbar. */
+.wer-ich {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.wer-ich em {
+  color: var(--accent-2);
+  font-style: normal;
+}
+.wer-ich a { text-decoration: none; }

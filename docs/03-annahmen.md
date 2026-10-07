@@ -64,14 +64,18 @@ oder die Effort-Stufe sinkt.
 
 ## Offene Punkte
 
-### O-01 — Einzelplatz oder Server für alle?
+### O-01 — Einzelplatz oder Server für alle? → **entschieden am 07.10.2026**
 
-Heute: lokal, ein Nutzer, `autor` als Textfeld. Für „alle Kollegen" braucht es
-einen Server, eine Anmeldung und eine Rechteprüfung — und der API-Schlüssel
-gehört dann nicht mehr in die Datenbank (siehe `02-datenmodell.md`, `setting`).
+*Beides.* `BITS_EG_MEHRBENUTZER` schaltet um: ohne Flag der Einzelplatz wie
+bisher, mit Flag Anmeldung über Keycloak und Rollen (E-19), Betrieb im Cluster
+(E-18), KI-Zugang nur aus der Umgebung (I-08).
 
-Das ist die größte offene Frage und eine Entscheidung von Marc, keine
-technische.
+Die Umschaltung ist eine Umgebungsvariable und keine Einstellung in der
+Datenbank: Eine Einstellung könnte jeder Angemeldete ändern — und damit die
+Anmeldepflicht abschalten, die ihn gerade hereingelassen hat.
+
+Offen bleibt davon nur der erste echte Lauf gegen `id.mybits.dev`; die
+Handgriffe dafür stehen in `docs/07-betrieb.md`.
 
 ### O-02 — Wohin geht der fertige Text?
 
@@ -93,6 +97,35 @@ kein Vertrauen.
 
 ### O-05 — Dürfen vertrauliche Fakten überhaupt in der Datei liegen?
 
-Der Faktenbestand enthält bei Kundenprojekten Internas. Die Datenbank liegt
-unverschlüsselt im Arbeitsverzeichnis. Für den Einzelplatz auf einem
-verschlüsselten Rechner vertretbar; für einen Server nicht ohne weiteres.
+*Jetzt eine Frage an Florian, keine theoretische mehr.*
+
+Der Faktenbestand enthält bei Kundenprojekten Internas und auf der Stufe
+`vertraulich` auch Preise und Personalthemen. Im Cluster liegt die Datei auf
+einem `PersistentVolumeClaim`. Zu klären:
+
+- Ist der Cluster-Storage verschlüsselt (at rest)?
+- Wer kommt an ein PVC — nur `cluster-admin`, oder jeder mit
+  `kubectl exec` im Namespace?
+
+Für den Einzelplatz auf einem verschlüsselten Rechner war die Frage
+vertretbar offen. Für einen Server, auf dem die Fakten mehrerer Kunden
+liegen, ist sie es nicht.
+
+### O-06 — Es gibt noch keine Sicherung
+
+Die Datenbank liegt auf einem Datenträger im Cluster und wird nirgends
+hinkopiert. Ein versehentliches `kubectl delete pvc` ist der ganze Verlust.
+
+Der Handgriff für heute ist ein `kubectl cp` der Datei aus dem Pod; der
+nächste Schritt ein `CronJob`, der sie auf ein Objektlager legt. Solange das
+fehlt, ist der Bestand nur so sicher wie das Volume.
+
+### O-07 — Das Repository liegt im falschen Account
+
+`runs-on: [generic, on-prem]` verlangt die selbst gehosteten Runner der
+Organisation `BITS-GmbH`. Ein Repository unter `Marc2017` sieht sie nicht —
+der Workflow schlägt mit „No runner matching the specified labels" fehl.
+
+Entweder umziehen (Settings → Transfer ownership) oder Florian gibt die
+Runner für dieses Repository frei. Das Umziehen ist ohnehin das Richtige: Ein
+Werkzeug für alle Kollegen gehört nicht in einen privaten Account.

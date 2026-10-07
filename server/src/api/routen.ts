@@ -1,6 +1,6 @@
 // Alle API-Handler. Jeder bekommt einen Kontext (params, query, body) und gibt
 // Daten zurueck; das Serialisieren uebernimmt server.ts.
-import { alle, schreib } from '../db/index.ts';
+import { alle, schreib, zahl } from '../db/index.ts';
 import {
   fakten, faktAendern, faktenFuerZiel, faktLoeschen, faktSetzen, fortschritt,
   katalog, type Stufe,
@@ -14,7 +14,11 @@ import {
   kunde, kunden, kundeSpeichern, projektarten, projektartSpeichern, struktur,
   ziel, ziele, zielSpeichern,
 } from '../db/vorlagen.ts';
-import { anzeige, lesen, SCHLUESSEL, setzen } from '../db/einstellung.ts';
+import { aenderbar, anzeige, lesen, SCHLUESSEL, setzen } from '../db/einstellung.ts';
+import { mehrbenutzer, NUR_UMGEBUNG, verwalterRolle } from '../db/betrieb.ts';
+import { anmeldungMoeglich } from '../auth/oidc.ts';
+import { istVerwalter } from '../auth/waechter.ts';
+import type { Sitzung } from '../auth/sitzung.ts';
 import { lernnotizen, lernnotizUebernehmen, lernnotizVerwerfen } from '../db/lernen.ts';
 import {
   anbieter, fehlerText, klientVerwerfen, modell, zugangVorhanden,
@@ -36,6 +40,17 @@ export interface Kontext {
    * Server antworten.
    */
   antwort?: import('node:http').ServerResponse;
+  /**
+   * Wer die Anfrage stellt. Im Einzelplatzbetrieb null - dort gibt es keine
+   * Anmeldung, und `null` heisst nicht "unberechtigt", sondern "niemand
+   * fragt danach".
+   */
+  sitzung?: Sitzung | null;
+}
+
+/** Wer arbeitet hier? Im Mehrbenutzerbetrieb der angemeldete Mensch. */
+function autorAus(k: Kontext): string | null {
+  return k.sitzung?.name ?? lesen(SCHLUESSEL.ichBin);
 }
 
 const nr = (k: Kontext, name: string) => Number(k.params[name]);
@@ -54,6 +69,53 @@ const pflicht = (k: Kontext, name: string): string => {
   return v;
 };
 
+// ------------------------------------------------------------------- Gesundheit
+
+/**
+ * Lebenszeichen fuer die Probes des Clusters (E-18).
+ *
+ * Bewusst OHNE Anmeldung erreichbar und ohne Inhalt: Kubernetes fragt hier im
+ * Sekundentakt, und eine Probe, die eine Sitzung braucht, meldet einen
+ * gesunden Pod als tot. Preisgegeben wird nur, dass der Dienst laeuft und die
+ * Datenbank antwortet - keine Zahlen aus dem Bestand.
+ */
+export function gesund(_k: Kontext) {
+  // Ein echter Lesezugriff, kein `SELECT 1`: Eine Datenbank, die geoeffnet
+  // aber nicht migriert ist, antwortet auf 1 und scheitert am Schema.
+  const stand = zahl('PRAGMA user_version');
+  const katalogZeilen = zahl('SELECT COUNT(*) FROM faktenrubrik');
+  return {
+    ok: katalogZeilen > 0,
+    schema: stand,
+    erstausstattung: katalogZeilen > 0,
+    ki: zugangVorhanden(),
+    zeit: new Date().toISOString(),
+  };
+}
+
+/**
+ * Wer bin ich, und was darf ich?
+ *
+ * Die Oberflaeche fragt das beim Start: Sie muss den Namen zeigen und wissen,
+ * ob sie die Verwaltung anbieten darf. Im Einzelplatzbetrieb antwortet der
+ * Endpunkt mit `angemeldet: false` und `verwalter: true` - dort gibt es
+ * keine Anmeldung, aber auch keine Einschraenkung.
+ */
+export function ich(k: Kontext) {
+  const s = k.sitzung ?? null;
+  return {
+    mehrbenutzer: mehrbenutzer(),
+    anmeldungMoeglich: anmeldungMoeglich(),
+    angemeldet: Boolean(s),
+    name: s?.name ?? lesen(SCHLUESSEL.ichBin),
+    benutzername: s?.benutzername ?? null,
+    email: s?.email ?? null,
+    rollen: s?.rollen ?? [],
+    verwalter: istVerwalter(s),
+    verwalterRolle: verwalterRolle(),
+  };
+}
+
 // ------------------------------------------------------------------ Startseite
 
 /**
@@ -71,7 +133,11 @@ export function start(_k: Kontext) {
       beschreibung: z.beschreibung, stufe: z.stufe,
     })),
     ki: { zugang: zugangVorhanden(), anbieter: anbieter(), modell: modell() },
-    ich: lesen(SCHLUESSEL.ichBin),
+    // `ich` ist seit der Anmeldung ein Objekt und kein Name mehr: Die
+    // Oberflaeche muss nicht nur wissen, WER hier arbeitet, sondern auch, was
+    // er darf.
+    ich: ich(_k),
+    betrieb: { mehrbenutzer: mehrbenutzer() },
   };
 }
 
@@ -88,7 +154,7 @@ export function storyNeu(k: Kontext) {
     arbeitstitel,
     projektart_id: k.body.projektart_id ? Number(k.body.projektart_id) : null,
     kunde_id: kundeId,
-    autor: text(k, 'autor') ?? lesen(SCHLUESSEL.ichBin),
+    autor: text(k, 'autor') ?? autorAus(k),
   });
   kundenfaktenSetzen(id, kundeId);
   return { id, ...storyVoll({ ...k, params: { id: String(id) } }) };
@@ -369,7 +435,7 @@ export async function importieren_(k: Kontext) {
       arbeitstitel: text(k, 'arbeitstitel'),
       projektart_id: k.body.projektart_id ? Number(k.body.projektart_id) : null,
       kunde_id: k.body.kunde_id ? Number(k.body.kunde_id) : null,
-      autor: text(k, 'autor') ?? lesen(SCHLUESSEL.ichBin),
+      autor: text(k, 'autor') ?? autorAus(k),
     }, strom.melder);
     if (k.body.kunde_id) kundenfaktenSetzen(ergebnis.story_id, Number(k.body.kunde_id));
     strom.fertig(ergebnis);
@@ -519,14 +585,24 @@ export function einstellungenLesen(_k: Kontext) {
 export function einstellungenSetzen(k: Kontext) {
   const bekannt = new Set<string>(Object.values(SCHLUESSEL));
   let geaendert = 0;
+  const abgewiesen: string[] = [];
   for (const [s, w] of Object.entries(k.body)) {
     if (!bekannt.has(s)) continue;
+    // I-08: Im Mehrbenutzerbetrieb nimmt der Server einen KI-Zugang aus der
+    // Oberflaeche nicht an. Stillschweigend zu ignorieren waere schlimmer als
+    // abzulehnen - der Nutzer glaubte sonst, er haette etwas geaendert.
+    if (!aenderbar(s)) {
+      abgewiesen.push(s);
+      continue;
+    }
     setzen(s, w === null || w === '' ? null : String(w));
     geaendert += 1;
   }
   klientVerwerfen();
   return {
     geaendert,
+    abgewiesen,
+    hinweis: abgewiesen.length ? NUR_UMGEBUNG : null,
     einstellungen: anzeige(),
     ki: { zugang: zugangVorhanden(), anbieter: anbieter(), modell: modell() },
   };

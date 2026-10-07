@@ -4,7 +4,7 @@
 // der Adresszeile (#/story/7), damit ein Neuladen nicht zur Startseite
 // zurueckwirft.
 import { useCallback, useEffect, useState } from 'react';
-import { api, type Startdaten } from './lib/api.ts';
+import { api, type Ich, type Startdaten } from './lib/api.ts';
 import { Arbeit } from './components/Arbeit.tsx';
 import { Start } from './components/Start.tsx';
 import { Verwaltung } from './components/Verwaltung.tsx';
@@ -66,7 +66,12 @@ export function App() {
   }
 
   if (ansicht.was === 'verwaltung') {
-    return <Verwaltung zurueck={() => gehe({ was: 'start' })} />;
+    return (
+      <Verwaltung
+        zurueck={() => gehe({ was: 'start' })}
+        ich={daten?.ich}
+      />
+    );
   }
 
   return (
@@ -83,6 +88,7 @@ export function App() {
               : 'KI: kein Zugang'}
           </span>
         )}
+        {daten && <Wer ich={daten.ich} />}
         <button type="button" className="knopf" onClick={() => gehe({ was: 'verwaltung' })}>
           Verwaltung
         </button>
@@ -107,5 +113,35 @@ export function App() {
         />
       )}
     </>
+  );
+}
+
+/**
+ * Wer angemeldet ist — und der Weg hinaus.
+ *
+ * Im Einzelplatzbetrieb zeigt die Zeile nichts: Dort gibt es keine Anmeldung,
+ * und ein „Abmelden", das nichts abmeldet, wäre eine Lüge in der Kopfzeile.
+ */
+function Wer({ ich }: { ich: Ich }) {
+  if (!ich.mehrbenutzer) return null;
+
+  if (!ich.angemeldet) {
+    return (
+      <a className="knopf haupt" href="/auth/login" style={{ textDecoration: 'none' }}>
+        Anmelden
+      </a>
+    );
+  }
+
+  return (
+    <span className="wer-ich">
+      <span title={[ich.email, ich.verwalter ? `Rolle: ${ich.verwalterRolle}` : null]
+        .filter(Boolean).join(' · ')}
+      >
+        {ich.name}
+        {ich.verwalter && <em> · Verwaltung</em>}
+      </span>
+      <a className="knopf leise" href="/auth/abmelden">Abmelden</a>
+    </span>
   );
 }

@@ -16,6 +16,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { lesen, SCHLUESSEL } from '../db/einstellung.ts';
+import { mehrbenutzer } from '../db/betrieb.ts';
 import { STILL, type Melder } from '../api/strom.ts';
 
 const hier = dirname(fileURLToPath(import.meta.url));
@@ -44,8 +45,19 @@ export function modell(): string {
   return lesen(SCHLUESSEL.modell) ?? MODELL_STANDARD;
 }
 
+/**
+ * Der Anthropic-Schluessel.
+ *
+ * I-08: Im Mehrbenutzerbetrieb kommt er AUSSCHLIESSLICH aus der Umgebung.
+ * Die Datenbank wird dort nicht einmal gefragt - ein Schluessel, der dort
+ * liegt (etwa aus der Zeit als Einzelplatz), darf nicht stillschweigend
+ * weiterverwendet werden: Er waere fuer jeden lesbar, der an die Datei kommt,
+ * und niemand wuesste, welcher der beiden gerade gilt.
+ */
 function anthropicSchluessel(): string | null {
-  return lesen(SCHLUESSEL.apiKey) ?? process.env.ANTHROPIC_API_KEY ?? null;
+  const ausUmgebung = process.env.ANTHROPIC_API_KEY?.trim() || null;
+  if (mehrbenutzer()) return ausUmgebung;
+  return lesen(SCHLUESSEL.apiKey) ?? ausUmgebung;
 }
 
 interface AzureZugang {
@@ -56,16 +68,22 @@ interface AzureZugang {
 }
 
 function azureZugang(): AzureZugang | null {
-  const key = lesen(SCHLUESSEL.azureKey) ?? process.env.AZURE_OPENAI_KEY ?? null;
-  const endpunkt = lesen(SCHLUESSEL.azureEndpunkt) ?? process.env.AZURE_OPENAI_ENDPUNKT ?? null;
-  const deployment = lesen(SCHLUESSEL.azureDeployment)
-    ?? process.env.AZURE_OPENAI_DEPLOYMENT ?? null;
+  // Dieselbe Regel wie fuer Anthropic (I-08): im Mehrbenutzerbetrieb nur die
+  // Umgebung.
+  const nurUmgebung = mehrbenutzer();
+  const aus = (schluessel: string, variable: string) => (nurUmgebung
+    ? (process.env[variable]?.trim() || null)
+    : (lesen(schluessel) ?? process.env[variable]?.trim() ?? null));
+
+  const key = aus(SCHLUESSEL.azureKey, 'AZURE_OPENAI_KEY');
+  const endpunkt = aus(SCHLUESSEL.azureEndpunkt, 'AZURE_OPENAI_ENDPUNKT');
+  const deployment = aus(SCHLUESSEL.azureDeployment, 'AZURE_OPENAI_DEPLOYMENT');
   if (!key || !endpunkt || !deployment) return null;
   return {
     key,
     endpunkt: endpunkt.replace(/\/+$/, ''),
     deployment,
-    version: lesen(SCHLUESSEL.azureVersion) ?? process.env.AZURE_OPENAI_VERSION ?? '2026-02-01',
+    version: aus(SCHLUESSEL.azureVersion, 'AZURE_OPENAI_VERSION') ?? '2026-02-01',
   };
 }
 

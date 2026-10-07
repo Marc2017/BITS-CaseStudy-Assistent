@@ -1,0 +1,35 @@
+# Nicht-geheime Cluster-Konfiguration. Alles hier ist Klartext und direkt
+# editierbar. Nur echte Geheimnisse (SESSION_SECRET, KEYCLOAK_CLIENT_SECRET,
+# ANTHROPIC_API_KEY) liegen verschluesselt in sealed-secret.yml.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: erfolgsgeschichten
+  namespace: hackathon-vibe
+data:
+  NODE_ENV: "production"
+  PORT: "4700"
+  AUTH_URL: "https://erfolgsgeschichten.mybits.dev"
+  FRONTEND_URL: "https://erfolgsgeschichten.mybits.dev"
+
+  # Die Datenbank liegt auf dem Datentraeger, nicht im Image.
+  BITS_EG_DB: "/app/server/data/erfolgsgeschichten.db"
+
+  # Mehrbenutzerbetrieb: Anmeldung ist Pflicht, und der KI-Schluessel kommt
+  # NUR aus der Umgebung - nicht aus der Datenbank und nicht aus der
+  # Oberflaeche (I-08). Ohne dieses Flag laeuft die Anwendung als
+  # Einzelplatzwerkzeug wie bisher.
+  BITS_EG_MEHRBENUTZER: "1"
+
+  # Keycloak, wie bits-burn es im Betrieb nutzt: Realm master unter
+  # id.mybits.dev. Der Client muss dort von Hand angelegt werden (siehe
+  # docs/07-betrieb.md).
+  KEYCLOAK_REALM: "master"
+  KEYCLOAK_CLIENT_ID: "erfolgsgeschichten"
+  KEYCLOAK_EXTERNAL_BASE_URL: "https://id.mybits.dev/auth"
+  KEYCLOAK_INTERNAL_BASE_URL: "https://id.mybits.dev/auth"
+
+  # Wer diese Realm-Rolle hat, darf die Verwaltung aendern (Ziele,
+  # Projektarten, Kunden, Faktenkatalog, Einstellungen). Alle anderen
+  # angemeldeten Benutzer duerfen Erfolgsgeschichten schreiben.
+  BITS_EG_ROLLE_VERWALTER: "erfolgsgeschichten-verwalter"

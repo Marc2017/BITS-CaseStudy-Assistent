@@ -123,6 +123,30 @@ const SCHRITTE: Schritt[] = [
       db.exec('CREATE INDEX IF NOT EXISTS sicherung_fertig ON fassung_sicherung(fertig, id)');
     },
   },
+
+  {
+    version: 4,
+    name: 'Sitzungen fuer die Anmeldung',
+    ausfuehren(db) {
+      // Serverseitige Sitzungen (E-19). Die Tabelle liegt in derselben
+      // Datenbank wie der Bestand: ein zweiter Speicher waere ein zweiter
+      // Dienst, den jemand betreiben muss.
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS sitzung (
+          id            TEXT PRIMARY KEY,
+          sub           TEXT NOT NULL,
+          name          TEXT NOT NULL,
+          email         TEXT,
+          benutzername  TEXT NOT NULL,
+          rollen        TEXT NOT NULL DEFAULT '[]',
+          erstellt_am   TEXT NOT NULL DEFAULT (datetime('now')),
+          gesehen_am    TEXT NOT NULL DEFAULT (datetime('now')),
+          ablauf        TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS sitzung_ablauf ON sitzung(ablauf);
+      `);
+    },
+  },
 ];
 
 export interface Ergebnis {

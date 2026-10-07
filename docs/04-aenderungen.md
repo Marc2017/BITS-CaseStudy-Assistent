@@ -180,3 +180,64 @@ Die Faktenspur meldete „26 gesamt", während der Reiter „Fakten 76" zeigte �
 für denselben Bestand. `fortschritt.gesamt` zählte die verschiedenen
 Faktenarten, nicht die Fakten. Jetzt sind es zwei Felder (`gesamt`, `arten`),
 und die Spur sagt „76 Fakten in 26 Rubriken".
+
+---
+
+## 07.10.2026 — Betriebsfähig für alle Kollegen
+
+Anlass: Marcs Frage an Florian Wenzel („Wie bekomme ich die Tools bei uns zum
+Laufen? Single Sign On für die Kollegen, ggf. mit Rollen") und dessen Antwort —
+containerisieren, CI/CD über GitHub Actions nach Harbor, `BITS-GmbH/bits-burn`
+als Vorlage.
+
+### Was dazugekommen ist
+
+| Datei | Was |
+|---|---|
+| `Dockerfile` | ein Image: Frontend bauen, Backend liefert es aus |
+| `.github/workflows/build-and-push.yml` | Harbor-Push bei Push auf `main` |
+| `k8s/*.yml` | Deployment mit Datenträger, Service, Gateway, Konfiguration |
+| `docker-compose.yaml` | lokaler Betrieb **mit** Keycloak und zwei Testbenutzern |
+| `server/src/auth/` | OIDC, Sitzungen, Wächter |
+| `server/src/db/betrieb.ts` | die Betriebsart als Umgebungsvariable |
+| `docs/07-betrieb.md` | die Anleitung — wer was tun muss |
+
+Entscheidungen: E-18 (Cluster), E-19 (Anmeldung). Neue Invariante: I-08
+(KI-Zugang nur aus der Umgebung). Migration M-4 (Tabelle `sitzung`).
+O-01 ist entschieden; O-05 ist von einer theoretischen zu einer konkreten
+Frage geworden; O-06 (Sicherung) und O-07 (Repository im falschen Account)
+sind neu.
+
+### Gemessen
+
+22 Tests grün (fünf neue zur Anmeldung, drei zu I-08). Beide Typprüfungen
+ohne Befund. Alle YAML-Dateien gültig geparst, Dockerfile-Pfade geprüft
+(jede `COPY`-Quelle existiert, das `CMD`-Ziel auch).
+
+Im echten HTTP-Lauf, gegen eine **Kopie** des Bestands:
+
+| Aufruf | Erwartet | Gemessen |
+|---|---|---|
+| `GET /api/gesund` | offen für die Probes | 200 |
+| `GET /api/start` ohne Sitzung | 401 mit Anmeldeweg | `{"fehler":"Nicht angemeldet.","anmelden":"/auth/login"}` |
+| `GET /` ohne Sitzung | zur Anmeldung | 302 → `/auth/login` |
+| `GET /auth/login` | zu Keycloak, mit PKCE | 302 mit `code_challenge_method=S256` |
+| Cookie mit erfundener Signatur | abgewiesen | 401 |
+| Kennung ohne Signatur | abgewiesen | 401 |
+| Rücksprung ohne Anmeldeversuch | abgewiesen | „Der Anmeldeversuch ist abgelaufen …" |
+| Rücksprung mit falschem `state` | abgewiesen | „Der Rücksprung gehört nicht zu diesem Anmeldeversuch." |
+| I-08: Schlüssel in der DB, Flag an | zählt nicht | `zugang: false` |
+| I-08: Schlüssel über die API setzen | abgewiesen | `abgewiesen: ["ki.api_key"]`, `ki.modell` im selben Aufruf gesetzt |
+
+### Nicht gemessen
+
+- **Das Image wurde nie gebaut** — auf diesem Rechner ist kein Docker.
+  Geprüft sind Pfade und Syntax, nicht der Lauf.
+- **Die Manifeste wurden nie angewandt** — dafür braucht es einen Cluster.
+- **Der Token-Tausch mit Keycloak** — der halbe Weg ist gemessen (die
+  Authorization-URL stimmt, der Rücksprung wird korrekt geprüft), aber kein
+  echtes Token wurde eingelöst. Dafür braucht es die Keycloak-Instanz aus
+  `docker-compose.yaml` oder `id.mybits.dev`.
+
+Das sind drei Messungen, die alle am fehlenden Docker hängen — und die erste
+davon passiert ohnehin im Runner.

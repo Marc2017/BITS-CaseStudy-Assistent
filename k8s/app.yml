@@ -1,0 +1,119 @@
+# Deployment, Service und Datenträger.
+#
+# Drei Dinge weichen hier bewusst vom Muster in bits-burn ab, und alle drei
+# haben denselben Grund: Die Datenbank ist eine SQLite-DATEI, kein Dienst.
+#
+#   1. `replicas: 1` — zwei Pods würden dieselbe Datei öffnen. SQLite sperrt
+#      zwar, aber zwei Prozesse mit WAL auf einem Netzlaufwerk sind genau das
+#      Szenario, in dem man seinen Bestand verliert.
+#   2. `strategy: Recreate` — bei RollingUpdate läuft der neue Pod kurz
+#      PARALLEL zum alten. Mit einem ReadWriteOnce-Volume hängt er dann im
+#      Status „Pending", und mit ReadWriteMany schreiben zwei Prozesse
+#      gleichzeitig. Recreate nimmt den alten Pod erst herunter: ein paar
+#      Sekunden Ausfall statt eines beschädigten Bestands.
+#   3. `fsGroup: 1000` — der Container läuft als Benutzer `node`, und ohne
+#      diese Gruppe darf er sein eigenes Volume nicht beschreiben.
+#
+# Wann das nicht mehr reicht: sobald mehrere Pods nötig sind oder ein
+# punktgenaues Zurückspielen gebraucht wird. Dann ist Postgres fällig (siehe
+# docs/01-entscheidungen.md, E-18).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: erfolgsgeschichten-daten
+  namespace: hackathon-vibe
+spec:
+  # Kein storageClassName: wie in bits-burn gilt die Vorgabe des Clusters.
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      # Der Bestand ist Text. Gemessen am 07.10.2026: vier Geschichten mit
+      # 181 Fakten und sieben Fassungen belegen unter 1 MB. 2 Gi sind Platz
+      # für Jahre, inklusive der abgelegten Versionen.
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: erfolgsgeschichten
+  namespace: hackathon-vibe
+  labels:
+    app: erfolgsgeschichten
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: erfolgsgeschichten
+  template:
+    metadata:
+      labels:
+        app: erfolgsgeschichten
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: erfolgsgeschichten
+          image: harbor.mybits.dev/erfolgsgeschichten/app
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 4700
+          envFrom:
+            - configMapRef:
+                name: erfolgsgeschichten
+            - secretRef:
+                name: erfolgsgeschichten
+          volumeMounts:
+            - name: daten
+              mountPath: /app/server/data
+          # Beide Probes fragen /api/gesund, nicht /: Der Endpunkt liest die
+          # Datenbank. Ein Prozess, der horcht, aber kein Schema hat, ist
+          # nicht gesund — und genau das ist der Zustand, in dem ein Pod
+          # Anfragen annehmen und mit 500 beantworten würde.
+          livenessProbe:
+            httpGet:
+              path: /api/gesund
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /api/gesund
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              # Großzügiger als bits-burn: Ein Import schickt bis zu 20.000
+              # Tokens an die KI und hält die Antwort im Speicher.
+              cpu: "1"
+              memory: 768Mi
+      volumes:
+        - name: daten
+          persistentVolumeClaim:
+            claimName: erfolgsgeschichten-daten
+      imagePullSecrets:
+        - name: harbor
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: erfolgsgeschichten
+  namespace: hackathon-vibe
+  labels:
+    app: erfolgsgeschichten
+spec:
+  type: ClusterIP
+  selector:
+    app: erfolgsgeschichten
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: http
+      name: http

@@ -84,6 +84,31 @@ Zwei Konsequenzen, beide umgesetzt:
    `migrieren()` alle Schritte, wenn `user_version = 0` war; damit hing die
    Gleichheit beider Wege daran, dass jemand beide Dateien gleich pflegt.
 
+### I-08 — Im Mehrbenutzerbetrieb kommt der KI-Zugang nur aus der Umgebung
+
+Läuft die Anwendung mit `BITS_EG_MEHRBENUTZER=1`, wird die Tabelle `setting`
+für den KI-Zugang **nicht einmal gefragt**. Der Schlüssel kommt aus
+`ANTHROPIC_API_KEY` (im Cluster aus einem Sealed Secret), und ein Versuch, ihn
+über die Oberfläche zu setzen, wird **sichtbar abgewiesen** —
+`abgewiesen: ["ki.api_key"]` statt stillschweigend verworfen.
+
+Zwei Gründe, und beide zählen:
+
+- Ein Schlüssel in der Datenbankdatei ist für jeden lesbar, der an die Datei
+  kommt — und er wandert in jede Sicherung.
+- Über die Oberfläche könnte ihn **jeder angemeldete Kollege austauschen**.
+  Die Kosten liefen weiter auf das BITS-Konto.
+
+Der gefährliche Fall ist die Datei, die aus dem Einzelplatzbetrieb mit einem
+Schlüssel darin in den Cluster wandert: Würde er stillschweigend
+weiterverwendet, wüsste niemand, welcher der beiden gerade gilt. Gemessen am
+07.10.2026 an einer Kopie des echten Bestands: Mit Flag und Schlüssel in der
+Datenbank meldet `/api/start` `zugang: false`.
+
+Betroffen sind `ki.api_key`, `ki.azure_key`, `ki.azure_endpunkt`,
+`ki.azure_deployment`, `ki.azure_version` und `ki.anbieter`. Alles andere
+(Modell, Effort, „Ich bin") bleibt änderbar — sonst wäre die Verwaltung tot.
+
 ### I-06 — Ohne Fakten wird nicht formuliert
 
 Eine Formulierung mit leerem oder fast leerem Faktenbestand wird abgewiesen,
@@ -204,6 +229,23 @@ sie nie hatte.
 `bezug` (`ziel` · `projektart` · `kunde` · `katalog`), `bezug_id`, `text`,
 `begruendung`, `status` (`offen` · `uebernommen` · `verworfen`).
 
+### `sitzung` — wer ist angemeldet (E-19)
+
+| Spalte | Bemerkung |
+|---|---|
+| `id` | Zufallskennung, 32 Byte; steht signiert im Cookie |
+| `sub` | die unveränderliche Kennung des Benutzers bei Keycloak |
+| `name`, `email`, `benutzername` | für die Anzeige |
+| `rollen` | JSON-Liste der Realm-Rollen aus dem Zugriffstoken |
+| `ablauf` | das Minimum aus Tokenablauf und zwölf Stunden |
+
+Serverseitig, damit Abmelden sofort wirkt. Eine abgelaufene Sitzung wird beim
+Lesen **gelöscht**, nicht nur ignoriert: Sonst wächst die Tabelle mit jeder
+Anmeldung, und ein abgelaufener Eintrag sähe in der Datenbank wie ein
+gültiger aus.
+
+Im Einzelplatzbetrieb bleibt die Tabelle leer — dort gibt es keine Anmeldung.
+
 ### `setting` — Einstellungen zur Laufzeit
 
 Schlüssel: `ki.anbieter`, `ki.modell`, `ki.effort`, `ki.api_key` (geheim,
@@ -224,6 +266,7 @@ Schlüsselspeicher.
 | — | `schema.sql` legt Version 1 an (Erstausstattung) | 17.09.2026 |
 | M-2 | Tabelle `kunde`, Spalte `story.kunde_id`, `lernnotiz.bezug` um `kunde` erweitert; die Projektart „Projekt bei MAN" entfernt und ihr Wissen als Kunde „MAN" übernommen (E-14) | 17.09.2026 |
 | M-3 | `fassung_sicherung` um `name`, `kommentar`, `fertig` und `stufe` erweitert (E-17) | 17.09.2026 |
+| M-4 | Tabelle `sitzung` für die Anmeldung (E-19) | 07.10.2026 |
 
 Zu M-2 zwei Anmerkungen, die beim nächsten Mal Zeit sparen:
 

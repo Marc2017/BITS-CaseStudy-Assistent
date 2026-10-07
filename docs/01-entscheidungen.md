@@ -276,3 +276,74 @@ entstanden ist — sonst behauptet eine alte Fassung eine Freigabe, die sie nie
 hatte. Aus demselben Grund ist die Stufe im Dialog sichtbar, aber **nicht
 eingebbar**: Eine Fassung, die aus öffentlichen Fakten entstanden ist, wird
 nicht dadurch intern, dass jemand es behauptet (I-04).
+
+## E-18 — Betrieb im Cluster: ein Image, SQLite auf einem Datenträger
+
+*07.10.2026 — nach dem Rat von Florian Wenzel, Vorlage `BITS-GmbH/bits-burn`*
+
+Das Werkzeug soll für alle Kollegen laufen, nicht auf einem Rechner. Florians
+Weg: containerisieren, CI/CD über GitHub Actions nach Harbor, und bits-burn
+als Muster nehmen. Das ist übernommen — mit drei begründeten Abweichungen:
+
+**Ein Image statt zwei.** bits-burn trennt `web` (nginx) und `api` (NestJS).
+Hier liefert der Node-Server das gebaute Frontend selbst aus; ein zweites
+Image wäre ein zweites Deployment, ein zweiter Service und eine zweite Route
+für dieselbe Sache.
+
+**Node 24 statt 22.** Kein Geschmack: Das Backend führt TypeScript direkt aus
+und nutzt `node:sqlite`. Unter Node 22 startet es nicht.
+
+**SQLite auf einem `PersistentVolumeClaim` statt Postgres.** Das ist die
+folgenreichste Abweichung, und sie erzwingt drei Dinge im Deployment:
+`replicas: 1`, `strategy: Recreate` und `fsGroup: 1000`. Zwei Pods auf
+derselben Datei sind der Weg, einen Bestand zu verlieren.
+
+Der Wechsel auf Postgres wird fällig, sobald eines gilt: mehrere Pods, ein
+punktgenaues Zurückspielen, oder mehr als eine Handvoll gleichzeitiger
+Interviews. Der Umbau betrifft `server/src/db/` vollständig und ist ein
+eigenes Vorhaben. Bis dahin ist die Entscheidung bewusst klein gehalten:
+Ein Datenträger und eine Datei sind nachvollziehbar, ein zweiter Dienst wäre
+eine zweite Sache, die jemand betreiben muss.
+
+Einzelheiten und die Handgriffe für Marc und Florian: `docs/07-betrieb.md`.
+
+## E-19 — Anmeldung über Keycloak, Rollen in zwei Stufen
+
+*07.10.2026 — auf Wunsch von Marc („Single Sign On für die Kollegen, ggf. mit
+Rollen")*
+
+OpenID Connect gegen Keycloak (`id.mybits.dev`, Realm `master`), Authorization
+Code mit PKCE, serverseitige Sitzung in einem signierten Cookie.
+
+**Ohne Bibliothek.** bits-burn benutzt `openid-client`, weil es dort an
+NestJS und Express hängt. Hier ist der Server `node:http` pur, und der
+gebrauchte Teil des Protokolls sind drei HTTP-Aufrufe — eine Abhängigkeit
+dafür wäre mehr Code, nicht weniger.
+
+**Keine Signaturprüfung am Token, und warum das hier richtig ist.** Das Token
+kommt nicht von einem Client, sondern direkt vom Token-Endpunkt — über eine
+TLS-Verbindung, die dieser Prozess selbst aufgebaut und mit dem
+Client-Secret authentisiert hat. Wer diese Antwort fälschen könnte, hätte
+schon TLS gebrochen; ein über dieselbe Verbindung geholter JWKS-Schlüssel
+fügt nichts hinzu. Geprüft werden die Angaben, die auch ein echtes Token
+falsch haben kann: **Aussteller, Empfänger, Ablauf**. Käme ein Token je von
+außen (ein Bearer-Header eines Kommandozeilenwerkzeugs), gilt das nicht mehr
+— dann muss die Signatur geprüft werden. Einen solchen Weg gibt es hier
+bewusst nicht.
+
+**Sitzung serverseitig, nicht als JWT im Cookie.** Zwei Gründe: Abmelden
+wirkt sofort (ein JWT bliebe bis zum Ablauf gültig), und die Rollen bleiben
+nachlesbar, statt vom Browser mitgebracht zu werden. Das Cookie trägt nur
+Kennung und HMAC darüber; `timingSafeEqual` beim Vergleich, damit die
+Laufzeit nicht verrät, wie viele Zeichen schon stimmen.
+
+**Zwei Rollenstufen, nicht mehr.** Wer angemeldet ist, darf
+Erfolgsgeschichten schreiben — das ist der Zweck des Werkzeugs, und eine
+feinere Abstufung wäre eine Hürde ohne Nutzen. Wer die Realm-Rolle
+`erfolgsgeschichten-verwalter` hat, darf zusätzlich Vorlagen, Kunden,
+Faktenkatalog und Einstellungen ändern. **Lesen bleibt frei:** Die
+Verwaltung zu sehen hilft beim Verstehen, und ohne sie wäre die Seite leer.
+
+Geprüft wird auf Methode **und** Pfad (`brauchtVerwalter()`): `GET` ist
+immer frei, `PUT` auf `/api/verwaltung/*` und `/api/einstellungen` braucht die
+Rolle.
