@@ -389,3 +389,28 @@ Prüfbar mit `kubectl get pod -n stories` (2/2 statt 1/1).
 | Realm-Rolle `erfolgsgeschichten-verwalter` | steht in Keycloak, in `k8s/config.yml` und in den Tests (E-19) |
 | Objektnamen im Cluster (`erfolgsgeschichten`, `-daten`, `-ingress-cert`, …) | benennen die **Anwendung**, nicht ihre Adresse. Im Namespace `stories` wäre `stories-daten` eine Tautologie |
 | Datenbankdatei `erfolgsgeschichten.db` | eine Umbenennung hieße: Migration des Bestands, ohne Gegenwert |
+
+## E-21 — Die Erstausstattung spielt der Server ein, nicht der Mensch
+
+*07.10.2026 — Befund aus der Container-Abnahme*
+
+Bis hierher war `npm run seed` ein Schritt in der Einrichtung. Im Container
+fiel auf, dass das nicht trägt: Ein frisches Volume liefert `ok: false` an
+`/api/gesund`, und im Cluster heißt das, dass der Pod nie bereit wird. Der
+Seed läuft jetzt beim Start, wenn die Datenbank leer ist (I-09).
+
+**Drei Wege standen zur Wahl:**
+
+| Weg | Warum nicht |
+|---|---|
+| Init-Container | braucht dasselbe Image und dieselbe Umgebung ein zweites Mal — zwei Stellen, die auseinanderlaufen können |
+| Job nach dem Ausrollen | eine Reihenfolge, die jemand kennen und einhalten muss; beim zweiten Cluster vergisst man sie |
+| **beim Start, wenn leer** | eine Stelle, kein Handgriff, und im Einzelplatz genauso richtig |
+
+Der dritte Weg hat einen Preis: Der Start schreibt in die Datenbank. Das ist
+vertretbar, weil er es nur in eine **leere** tut — die Bedingung ist dieselbe,
+die der Gesundheitsendpunkt prüft, und damit gibt es keinen Zustand, in dem
+der Server etwas einspielt, das jemand bewusst entfernt hat.
+
+`npm run seed` bleibt als Befehl bestehen, für `--ersetzen` und für den Fall,
+dass jemand den Lieferstand zurückholen will.

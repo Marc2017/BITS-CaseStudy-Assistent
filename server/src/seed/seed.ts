@@ -135,5 +135,33 @@ export function seed(): void {
   }
 }
 
+/**
+ * Erstausstattung einspielen, aber NUR wenn die Datenbank leer ist.
+ *
+ * Das ist der Weg fuer den Container: Ein frisches Volume hat ein Schema
+ * (die Migration laeuft beim Start), aber keine Vorlagen - und ohne
+ * Faktenrubriken meldet `/api/gesund` `ok: false`. Im Cluster heisst das:
+ * Die Readiness-Probe wird nie gruen, der Pod nimmt nie Anfragen an, und
+ * niemand kommt an eine Oberflaeche, ueber die er seeden koennte. Ein
+ * `docker compose exec app npm run seed` von Hand ist im Einzelplatz ein
+ * Handgriff, im Cluster eine Falle.
+ *
+ * Warum nur bei LEERER Datenbank und nicht bei jedem Start: `seed()` ohne
+ * `--ersetzen` schreibt zwar nur Fehlendes und wuerde keine geaenderte
+ * Vorlage ueberschreiben - aber ein bewusst GELOESCHTES Ziel kaeme beim
+ * naechsten Neustart zurueck. Eine Erstausstattung, die sich nicht
+ * abbestellen laesst, ist keine.
+ *
+ * Die Bedingung ist dieselbe, die `/api/gesund` prueft: keine
+ * Faktenrubriken = frischer Bestand. Wer alle Rubriken entfernt, hat kein
+ * benutzbares Werkzeug mehr, und bekommt die Erstausstattung zurueck.
+ */
+export function erstausstattungFallsLeer(): boolean {
+  const da = eine<{ n: number }>('SELECT COUNT(*) AS n FROM faktenrubrik');
+  if ((da?.n ?? 0) > 0) return false;
+  seed();
+  return true;
+}
+
 // Direkt aufgerufen? Dann ausfuehren.
 if (process.argv[1]?.endsWith('seed.ts')) seed();

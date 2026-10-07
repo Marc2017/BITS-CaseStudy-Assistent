@@ -5,6 +5,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { dirname, extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { datenbank } from '../db/index.ts';
+import { erstausstattungFallsLeer } from '../seed/seed.ts';
 import * as r from './routen.ts';
 import { fehlerText } from '../ki/anbieter.ts';
 import { anmeldeweg, pruefen } from '../auth/waechter.ts';
@@ -209,6 +210,16 @@ const server = createServer(async (req, res) => {
 });
 
 datenbank();
+
+// Ein frisches Volume hat nach der Migration ein Schema, aber keine
+// Vorlagen - und ohne Faktenrubriken meldet /api/gesund `ok: false`. Im
+// Cluster wuerde die Readiness-Probe darum nie gruen (gemessen am
+// 07.10.2026 in einem frischen Compose-Volume). Eingespielt wird nur in
+// eine LEERE Datenbank; Begruendung an `erstausstattungFallsLeer()`.
+if (erstausstattungFallsLeer()) {
+  console.log('Leere Datenbank: Erstausstattung eingespielt.');
+}
+
 server.listen(PORT, () => {
   console.log(`BITS Erfolgsgeschichte-Assistent auf http://localhost:${PORT}`);
   console.log('  Entwicklungsbetrieb: npm run dev (Backend + Vite)');

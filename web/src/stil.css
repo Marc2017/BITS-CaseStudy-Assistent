@@ -518,7 +518,7 @@ label.zeile > span {
 
 /* Ein leeres Blatt sagt, was zu tun ist. */
 .dok:empty::before {
-  content: "Hier schreiben — oder oben „Formulieren" drücken.";
+  content: "Hier schreiben — oder oben „Formulieren“ drücken.";
   color: #A9A093;
   font: 14px/1.5 var(--sans);
 }

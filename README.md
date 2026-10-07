@@ -9,7 +9,9 @@ Angebot.
 **Stand: 07.10.2026** — Mit echter KI durchgemessen (Import, Interview, beide
 Fassungen, Eingabehilfen) und **betriebsfähig für alle Kollegen**: Container,
 CI/CD nach Harbor, Cluster-Manifeste und Anmeldung über Keycloak mit zwei
-Rollenstufen. Was noch nicht gemessen ist, steht unter „Offene Punkte".
+Rollenstufen. Das Image ist inzwischen real gebaut und im Container gelaufen;
+unter `https://stories.mybits.dev` soll es stehen. Was noch nicht gemessen
+ist, steht unter „Offene Punkte".
 
 ## Zwei Betriebsarten
 
@@ -195,9 +197,11 @@ Kicker nennen „Hotellerie & Reisen".
   zuverlässig (A-03). Von Hand in einer Minute geprüft.
 - **Der Lernmodus** ist gebaut und typgeprüft, aber noch nicht mit echter KI
   gelaufen.
-- **Das Image wurde nie gebaut und die Manifeste nie angewandt.** Auf dem
-  Entwicklungsrechner ist kein Docker; geprüft sind Pfade, Syntax und Struktur,
-  nicht der Lauf. Der erste echte Build passiert im Runner.
+- **Die Manifeste wurden nie angewandt** — dafür braucht es den Cluster.
+  Image und Compose sind dagegen gemessen: `docker build` läuft durch,
+  `docker compose up` startet Anwendung und Keycloak, und ein frisches
+  Volume ist ohne Zutun gesund (07.10.2026, Docker 29.8.2 in WSL2).
+  Nach Harbor geschoben wurde noch nichts.
 - **Der Token-Tausch mit Keycloak ist ungemessen.** Der halbe Weg steht: Die
   Authorization-URL stimmt (mit PKCE), ein Rücksprung mit falschem `state`
   oder gefälschtem Cookie wird abgewiesen. Ein echtes Token wurde nie

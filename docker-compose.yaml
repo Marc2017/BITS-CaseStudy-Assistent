@@ -10,6 +10,15 @@
 #   verwalter / test   -> darf alles
 #   kollege   / test   -> darf Erfolgsgeschichten schreiben, nicht verwalten
 #
+# Die Erstausstattung muss niemand einspielen: Der Server tut es beim Start,
+# wenn die Datenbank leer ist (I-09). Ein frisches Volume ist damit sofort
+# gesund - vorher meldete /api/gesund `ok: false`, und im Cluster waere die
+# Readiness-Probe nie gruen geworden (F-04).
+#
+# Unter WSL2: Ein Container auf 4700 kollidiert NICHT mit einem lokalen
+# Node-Server auf Windows-Port 4700 - aber der Browser sieht dann den
+# lokalen. Fuer einen Anmeldetest `npm run dev` vorher beenden.
+#
 # Ohne Anmeldung (Einzelplatz, wie bisher): npm run dev
 services:
   app:

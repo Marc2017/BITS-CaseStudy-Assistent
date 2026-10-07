@@ -109,6 +109,33 @@ Betroffen sind `ki.api_key`, `ki.azure_key`, `ki.azure_endpunkt`,
 `ki.azure_deployment`, `ki.azure_version` und `ki.anbieter`. Alles andere
 (Modell, Effort, „Ich bin") bleibt änderbar — sonst wäre die Verwaltung tot.
 
+### I-09 — Die Erstausstattung läuft nur in eine leere Datenbank
+
+Der Server spielt Faktenkatalog, Ziele, Projektarten und Kunden beim Start
+ein — aber **nur**, wenn `faktenrubrik` leer ist
+(`erstausstattungFallsLeer()` in `server/src/seed/seed.ts`).
+
+Beide Richtungen haben einen Grund, und beide sind gemessen:
+
+**Warum überhaupt beim Start.** Ein frisches Volume hat nach der Migration
+ein Schema, aber keine Vorlagen. `/api/gesund` meldet dann `ok: false`, weil
+es die Faktenrubriken zählt — im Cluster wird die Readiness-Probe damit nie
+grün, der Pod nimmt nie Anfragen an, und niemand erreicht eine Oberfläche,
+über die er seeden könnte. Ein `docker compose exec app npm run seed` ist im
+Einzelplatz ein Handgriff und im Cluster eine Falle.
+
+**Warum nicht bei jedem Start.** `seed()` ohne `--ersetzen` schreibt nur, was
+fehlt, und würde eine geänderte Vorlage nicht zurücksetzen — aber ein bewusst
+**gelöschtes** Ziel käme beim nächsten Neustart wieder. Eine Erstausstattung,
+die sich nicht abbestellen lässt, ist keine.
+
+Die Bedingung ist dieselbe, die `/api/gesund` prüft. Wer alle Rubriken
+entfernt, hat kein benutzbares Werkzeug mehr und bekommt den Lieferstand
+zurück; das ist der gewollte Ausgang.
+
+Test: `kern.test.ts`, „I-09" — ein gelöschtes Ziel bleibt gelöscht, eine
+leere Datenbank wird gefüllt.
+
 ### I-06 — Ohne Fakten wird nicht formuliert
 
 Eine Formulierung mit leerem oder fast leerem Faktenbestand wird abgewiesen,

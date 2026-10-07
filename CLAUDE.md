@@ -43,6 +43,13 @@ Liste `OFFEN` ist abschließend (alles andere braucht eine Anmeldung), und
 eine Liste und kein Muster — ein Muster gibt beim nächsten Endpunkt unbemerkt
 zu viel frei.
 
+**Wer am Startweg oder an der Erstausstattung arbeitet**, kennt **I-09**: Der
+Server spielt die Vorlagen beim Start ein, aber nur in eine **leere**
+Datenbank. Ohne das erste wird ein Pod mit frischem Volume nie bereit
+(`/api/gesund` zählt die Faktenrubriken); ohne das zweite käme ein bewusst
+gelöschtes Ziel bei jedem Neustart zurück. Beide Richtungen sind getestet —
+wer eine davon aufgibt, merkt es erst im Cluster oder beim Benutzer.
+
 ## Nach der Arbeit nachtragen
 
 Am Ende jeder Sitzung, in der etwas Inhaltliches passiert ist:

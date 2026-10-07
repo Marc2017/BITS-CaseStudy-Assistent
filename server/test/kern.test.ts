@@ -23,7 +23,7 @@ const { fassung, fassungSpeichern, sicherungen, storyAnlegen } = await import('.
 const { zielNach } = await import('../src/db/vorlagen.ts');
 const { formulieren } = await import('../src/ki/formulierung.ts');
 const { textAus } = await import('../src/ki/importieren.ts');
-const { seed } = await import('../src/seed/seed.ts');
+const { erstausstattungFallsLeer, seed } = await import('../src/seed/seed.ts');
 const { mehrbenutzer } = await import('../src/db/betrieb.ts');
 const { aenderbar, anzeige, setzen, SCHLUESSEL } = await import('../src/db/einstellung.ts');
 const { zugangVorhanden } = await import('../src/ki/anbieter.ts');
@@ -388,5 +388,64 @@ describe('E-19: Anmeldung, Sitzung und Rollen', () => {
     assert.equal(brauchtVerwalter('POST', '/api/storys'), false);
     assert.equal(brauchtVerwalter('POST', '/api/storys/1/interview'), false);
     assert.equal(brauchtVerwalter('PUT', '/api/storys/1/fassung/1'), false);
+  });
+});
+
+describe('I-09: die Erstausstattung laeuft nur in eine leere Datenbank', () => {
+  // Der Server spielt sie beim Start ein, weil ein frisches Volume im
+  // Cluster sonst nie `ready` wird (/api/gesund prueft die Faktenrubriken).
+  // Die Gefahr dabei ist die Gegenrichtung: Laeuft sie bei JEDEM Start, kommt
+  // eine bewusst geloeschte Vorlage zurueck - und niemand findet den Grund.
+  it('ruehrt einen vorhandenen Bestand nicht an', () => {
+    const zieleVorher = zahl('SELECT COUNT(*) FROM ziel');
+    const rubriken = zahl('SELECT COUNT(*) FROM faktenrubrik');
+    assert.ok(rubriken > 0, 'Vorbedingung: der Bestand ist gefuellt');
+
+    // Eine Vorlage bewusst entfernen, wie ein Benutzer es tun wuerde.
+    schreib("DELETE FROM ziel WHERE schluessel = 'angebot'");
+    assert.equal(zahl('SELECT COUNT(*) FROM ziel'), zieleVorher - 1);
+
+    assert.equal(erstausstattungFallsLeer(), false, 'nicht leer: kein Einspielen');
+    assert.equal(
+      zahl("SELECT COUNT(*) FROM ziel WHERE schluessel = 'angebot'"), 0,
+      'das geloeschte Ziel bleibt geloescht',
+    );
+  });
+
+  it('spielt in eine leere Datenbank ein', () => {
+    // „Leer" heisst: keine Faktenrubriken - dieselbe Bedingung, die
+    // /api/gesund prueft. Wer alle Rubriken entfernt, hat kein benutzbares
+    // Werkzeug mehr und bekommt den Lieferstand zurueck.
+    schreib('DELETE FROM faktenrubrik');
+    assert.equal(zahl('SELECT COUNT(*) FROM faktenrubrik'), 0);
+
+    assert.equal(erstausstattungFallsLeer(), true, 'leer: eingespielt');
+    assert.ok(zahl('SELECT COUNT(*) FROM faktenrubrik') > 0, 'Rubriken sind zurueck');
+    assert.ok(
+      zahl("SELECT COUNT(*) FROM ziel WHERE schluessel = 'angebot'") > 0,
+      'und die Ziele ebenfalls',
+    );
+  });
+});
+
+describe('CSS: content-Zeichenketten sind geschlossen', () => {
+  // Steht hier, obwohl es das Frontend betrifft: Dies ist die einzige Stelle,
+  // an der im Projekt Tests laufen. Anlass war ein gerades " mitten in einem
+  // deutschen Zitat - `content: "… „Formulieren" drücken."`. Der CSS-String
+  // endete dort, die Deklaration wurde verworfen, und der Platzhalter auf dem
+  // leeren Blatt fehlte. Der Vite-Build meldet das als WARNUNG und baut
+  // weiter, also faellt es sonst niemandem auf.
+  it('jede content:-Deklaration hat eine gerade Zahl gerader Anfuehrungszeichen', async () => {
+    const { readFileSync } = await import('node:fs');
+    const pfad = new URL('../../web/src/stil.css', import.meta.url);
+    const zeilen = readFileSync(pfad, 'utf8').split(/\r?\n/);
+    const schief = zeilen
+      .map((z, i) => ({ nr: i + 1, z }))
+      .filter(({ z }) => /(^|[\s;{])content\s*:/.test(z))
+      .filter(({ z }) => (z.match(/"/g) ?? []).length % 2 !== 0);
+    assert.deepEqual(
+      schief.map((s) => `${s.nr}: ${s.z.trim()}`), [],
+      'ein unpaariges " beendet die Zeichenkette mitten im Satz',
+    );
   });
 });

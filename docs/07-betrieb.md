@@ -191,6 +191,17 @@ docker compose up --build
 
 Dann `http://localhost:4700`, Anmeldung mit `test` / `test`.
 
+**Unter WSL2 eine Falle mit dem Port.** WSL2 arbeitet im NAT-Modus: Ein
+Container auf 4700 kollidiert **nicht** mit einem Node-Server auf
+Windows-Port 4700 — beide starten, und der Windows-Browser sieht den lokalen
+Server. Wer den Anmeldeweg im Browser prüfen will, beendet also zuerst
+`npm run dev`. Einen anderen Port zu nehmen hilft nicht: Der mitgelieferte
+Realm erlaubt Rücksprünge nur auf `localhost:4700` und `:5273`.
+
+**Die Erstausstattung muss niemand einspielen.** Der Server tut es beim
+Start, wenn die Datenbank leer ist (I-09). Ein frisches Volume ist damit
+sofort gesund; `npm run seed` braucht es nur noch für `--ersetzen`.
+
 Ohne Docker bleibt der Weg von bisher:
 
 ```bash
@@ -199,14 +210,31 @@ npm run dev          # Einzelplatz, keine Anmeldung
 
 ---
 
-## Was noch nicht gemessen ist
+## Was gemessen ist — und was nicht
 
-- **Das Image wurde nie gebaut.** Auf diesem Rechner ist kein Docker
-  installiert; geprüft sind die Pfade (alle `COPY`-Quellen existieren, das
-  `CMD`-Ziel auch) und die Syntax, nicht der Lauf. Der erste echte Build
-  passiert im Runner.
-- **Die Manifeste wurden nie angewandt.** YAML-Syntax und Struktur sind
-  geprüft (`kind`/`name` je Dokument), ein `kubectl apply --dry-run=server`
-  braucht einen Cluster.
-- **Keycloak ist nicht gegengetestet.** Die Anbindung folgt dem Muster aus
-  bits-burn; der erste Lauf gegen `id.mybits.dev` ist eine Messung.
+**Gemessen am 07.10.2026** (Docker Engine 29.8.2, Compose v5.6.0, WSL2 mit
+Ubuntu 24.04, kein Docker Desktop):
+
+- `docker build` läuft durch — einschließlich `npm run typen` und des
+  Vite-Builds im Bauabschnitt.
+- `docker compose up -d` startet Anwendung und Keycloak; die Anwendung
+  meldet `healthy`.
+- Ein **frisches Volume** ist ohne Zutun gesund: `/api/gesund` antwortet
+  `{"ok":true,"schema":4,"erstausstattung":true}`, der Docker-Healthcheck
+  steht nach einem Versuch auf `healthy` (I-09).
+- Der Anmeldeweg bis zum Formular: `/auth/login` leitet mit PKCE auf
+  Keycloak, mit `redirect_uri=http://localhost:4700/auth/callback`.
+- Ohne Sitzung antwortet `/api/start` mit
+  `{"fehler":"Nicht angemeldet.","anmelden":"/auth/login"}` — der
+  Mehrbenutzerbetrieb greift im Container.
+
+**Weiterhin ungemessen:**
+
+- **Der Token-Tausch mit Keycloak.** Eine Anmeldung einzutippen ist
+  Zugangsdatenarbeit; das bleibt bei Marc. Geprüft ist alles davor und die
+  Abwehr danach (falscher `state`, gefälschtes Cookie).
+- **Die Manifeste wurden nie angewandt.** YAML-Syntax und die Verweise
+  untereinander sind geprüft (16 Prüfungen, E-20), ein
+  `kubectl apply --dry-run=server` braucht einen Cluster.
+- **Harbor.** Das Image wurde lokal gebaut, nie geschoben — dafür fehlt das
+  Projekt auf `harbor.mybits.dev`.

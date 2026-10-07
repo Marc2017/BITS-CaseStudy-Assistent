@@ -286,3 +286,97 @@ steht das falsche da, bleibt der Sidecar **still** weg. Die Anwendung läuft
 dann trotzdem — es fehlt mTLS, nicht die Funktion. Prüfbar am ersten Pod
 (`2/2` statt `1/1`); welches Label `hackathon-vibe` trägt, ist die Frage an
 Florian.
+
+---
+
+## 07.10.2026 — Container-Abnahme: vier Befunde, drei behoben
+
+Docker Engine 29.8.2 mit Compose v5.6.0 in WSL2/Ubuntu 24.04 (kein Docker
+Desktop) steht jetzt auf dem Rechner. Damit ist nachgeholt, was bis gestern
+als „nicht gemessen" in dieser Akte stand — und die Abnahme hat vier Dinge
+gefunden.
+
+### F-04 — Ein frisches Volume wurde nie gesund (behoben)
+
+**Der Befund.** `/api/gesund` meldet in einem frischen Volume `ok: false`.
+`ok` ist `COUNT(*) FROM faktenrubrik > 0`, und die Erstausstattung lief im
+Container nicht von selbst — erst `docker compose exec app npm run seed`
+machte den Dienst gesund.
+
+**Warum das mehr ist als ein Handgriff.** Im Einzelplatz merkt man es und
+tippt den Befehl. Im Cluster ist es ein Deadlock: Die Readiness-Probe fragt
+`/api/gesund`, der Pod wird nie bereit, der Dienst nimmt keine Anfragen an —
+und die Oberfläche, über die man seeden könnte, ist genau dieser Dienst. Das
+Deployment wäre beim ersten Ausrollen hängen geblieben, ohne dass das YAML
+einen Fehler hat.
+
+**Die Ursache** ist eine Annahme aus der Einzelplatzzeit: `npm run setup`
+führte `npm install && npm run seed` zusammen aus, also war die
+Erstausstattung Teil der *Einrichtung*. Im Container gibt es keine
+Einrichtung — es gibt einen Start.
+
+**Behoben** über `erstausstattungFallsLeer()`, aufgerufen in `server.ts` nach
+`datenbank()`. Neue Invariante I-09, Entscheidung E-21, zwei Tests.
+
+**Gemessen**, dreimal:
+
+| Lage | Erwartet | Gemessen |
+|---|---|---|
+| lokal, Datenbankdatei existiert nicht | Erstausstattung, `ok: true` | 30 Rubriken, 4 Ziele, 6 Projektarten, 1 Kunde; `{"ok":true,"schema":4}` |
+| lokal, ein Ziel von Hand gelöscht, Neustart | bleibt gelöscht | 3 Ziele statt 4, keine Einspielmeldung |
+| Container, frisches Volume, kein Seed von Hand | `ok: true`, Probe grün | `{"ok":true,"erstausstattung":true}`, Docker-Status `healthy` nach **einem** Versuch |
+
+### F-05 — Ein gerades Anführungszeichen hat eine CSS-Regel zerlegt (behoben)
+
+**Der Befund.** Der Vite-Build meldet `Unterminated string token
+[css-syntax-error]`. Keine Fehlermeldung, nur eine Warnung — der Build läuft
+durch, also fiel es wochenlang niemandem auf.
+
+**Die Ursache**, `web/src/stil.css:521`:
+
+```
+content: "Hier schreiben — oder oben „Formulieren" drücken.";
+                                                 ^ U+0022 statt U+201C
+```
+
+Das deutsche Zitat öffnet typografisch (`„`, U+201E) und schließt **gerade**
+(`"`, U+0022). Für den CSS-Parser endet die Zeichenkette dort; der Rest
+(` drücken.";`) ist Müll, und die Deklaration wird verworfen. Betroffen war
+`.dok:empty:before` — der Platzhalter auf dem **leeren Blatt**, also genau der
+Hinweis, der einem neuen Benutzer sagt, was er tun soll. Im gebauten CSS ließ
+sich das sehen: Der Minifier gab auf und ließ einen rohen Zeilenumbruch
+mitten in der Regel stehen (`";\ncolor: #A9A093;`); nach der Korrektur steht
+dort sauber `";color:#a9a093;`.
+
+**Der Grund, warum es durchging:** `npm test` prüft TypeScript und das
+Backend, nie das CSS. Dagegen jetzt ein Test in `kern.test.ts`, der jede
+`content:`-Deklaration auf eine gerade Zahl gerader Anführungszeichen prüft.
+Gegenprobe gemacht: Fehler wieder eingebaut → 24 Tests grün, 1 rot; Datei
+zurückgesetzt → 25 grün.
+
+### F-06 — Die Akte behauptete, es sei nichts gebaut worden (behoben)
+
+`README.md` und `07-betrieb.md` führten „Das Image wurde nie gebaut" als
+offenen Punkt. Das stimmte bis zur Abnahme und stimmt jetzt nicht mehr;
+beide Stellen sind auf den gemessenen Stand gebracht. Eine Akte, die
+Gemessenes als ungemessen führt, ist genauso falsch wie umgekehrt — nur
+ungefährlicher.
+
+### Offen: der Port unter WSL2
+
+Kein Fehler, aber eine Falle für den nächsten Durchgang. WSL2 läuft im
+NAT-Modus: Ein Container auf 4700 **kollidiert nicht** mit einem Node-Server
+auf Windows-Port 4700 — aber der Windows-Browser sieht dann den lokalen
+Server, nicht den Container. Für einen Anmeldetest im Browser muss der
+lokale Server aus sein; ein anderer Port hilft nicht, weil der lokale Realm
+nur Rücksprünge auf `localhost:4700` und `:5273` erlaubt. Steht jetzt in
+`07-betrieb.md`.
+
+### Was weiterhin ungemessen ist
+
+Der Token-Tausch mit Keycloak. Der Weg ist bis zum Anmeldeformular geprüft
+(`/auth/login` → 302 auf `localhost:8080/.../openid-connect/auth`, mit
+`redirect_uri=http://localhost:4700/auth/callback` und
+`client_id=erfolgsgeschichten`), aber eine Anmeldung einzutippen ist
+Zugangsdatenarbeit und bleibt bei Marc. Ebenso die Manifeste: Dafür braucht
+es den Cluster.
