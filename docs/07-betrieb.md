@@ -5,6 +5,17 @@ Stand: 07.10.2026 · Vorlage: `BITS-GmbH/bits-burn` (Rat von Florian Wenzel)
 Diese Datei sagt, wie das Werkzeug aus dem Einzelplatz in den Cluster kommt —
 und was dafür **nicht** in diesem Repository passieren kann.
 
+| | |
+|---|---|
+| Adresse | `https://stories.mybits.dev` |
+| Namespace | `stories` |
+| Image | `harbor.mybits.dev/erfolgsgeschichten/app` |
+| Anmeldung | Keycloak, Realm `master` unter `https://id.mybits.dev/auth` |
+
+Adresse und Namespace sind kurz, die übrigen Namen tragen den vollen
+Gattungsnamen — die Begründung samt Liste dessen, was bewusst *nicht*
+umbenannt wurde, steht in `01-entscheidungen.md`, E-20.
+
 ---
 
 ## Was wo liegt
@@ -14,6 +25,7 @@ und was dafür **nicht** in diesem Repository passieren kann.
 | `Dockerfile` | baut ein Image: Frontend bauen, Backend mit dem gebauten Frontend ausliefern |
 | `.dockerignore` | hält `server/data` (den echten Bestand) und `node_modules` aus dem Image |
 | `.github/workflows/build-and-push.yml` | baut bei jedem Push auf `main` und schiebt nach Harbor |
+| `k8s/namespace.yml` | der Namespace `stories` samt Istio-Label |
 | `k8s/app.yml` | Deployment, Service, Datenträger |
 | `k8s/config.yml` | nicht-geheime Konfiguration (URLs, Realm, Rollenname) |
 | `k8s/secrets.example.yml` | Vorlage für die Geheimnisse — **wird nicht ausgerollt** |
@@ -103,7 +115,7 @@ Er darf **nicht** mehr über die Oberfläche gesetzt werden (I-08):
 
 ```bash
 echo -n 'sk-ant-…' | kubeseal --raw --name erfolgsgeschichten \
-  --namespace hackathon-vibe --cert public-key.pem
+  --namespace stories --cert public-key.pem
 ```
 
 Das Ergebnis nach `k8s/sealed-secret.yml` unter `spec.encryptedData`. Dasselbe
@@ -118,22 +130,24 @@ für `SESSION_SECRET` (`openssl rand -base64 48`) und
 
 1. **Harbor-Projekt** `erfolgsgeschichten` anlegen, dazu ein Robot-Konto mit
    Push-Recht.
-2. **Namespace klären.** Die Manifeste nutzen `hackathon-vibe` — denselben wie
-   bits-burn, weil dort das `harbor`-Pull-Secret, der Istio-Selector
-   `ingressgateway-frp` und der ClusterIssuer `letsencrypt-mybits-dev` schon
-   eingerichtet sind. Ein eigener Namespace braucht Pull-Secret und
-   Istio-Einbindung neu. Wenn das gewünscht ist: Suchen und Ersetzen in
-   `k8s/*.yml`.
-3. **DNS** für `erfolgsgeschichten.mybits.dev` auf das Ingress-Gateway.
+2. **Namespace `stories`** anlegen — oder Marc das Recht dazu geben, dann
+   bringt `k8s/namespace.yml` ihn beim Ausrollen mit. Die Frage, was ein
+   eigener Namespace gegenüber `hackathon-vibe` neu braucht, ist beantwortet
+   (Florian, 07.10.2026): **Istio-Selector derselbe, ClusterIssuer
+   clusterweit, Harbor-Pull-Secret wird in alle Namespaces übertragen.**
+   Offen bleibt eine Kleinigkeit: Welches Injection-Label trägt
+   `hackathon-vibe` — `istio-injection: enabled` oder `istio.io/rev`? Die
+   Manifeste setzen das erste.
+3. **DNS** für `stories.mybits.dev` auf das Ingress-Gateway.
 4. **Keycloak-Client** im Realm `master` unter `https://id.mybits.dev/auth`:
 
    | Feld | Wert |
    |---|---|
    | Client ID | `erfolgsgeschichten` |
    | Client authentication | ein (confidential) |
-   | Valid redirect URIs | `https://erfolgsgeschichten.mybits.dev/auth/callback` |
-   | Valid post logout redirect URIs | `https://erfolgsgeschichten.mybits.dev/` |
-   | Web origins | `https://erfolgsgeschichten.mybits.dev` |
+   | Valid redirect URIs | `https://stories.mybits.dev/auth/callback` |
+   | Valid post logout redirect URIs | `https://stories.mybits.dev/` |
+   | Web origins | `https://stories.mybits.dev` |
 
 5. **Realm-Rolle** `erfolgsgeschichten-verwalter` anlegen und den Personen
    geben, die Vorlagen, Kunden und den Faktenkatalog pflegen dürfen. Wer

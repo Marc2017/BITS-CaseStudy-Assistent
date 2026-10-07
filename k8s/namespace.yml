@@ -1,0 +1,28 @@
+# Der eigene Namespace.
+#
+# Vorher lagen die Manifeste in `hackathon-vibe`, dem Namespace von bits-burn —
+# aus Vorsicht: Dort waren Pull-Secret, Istio-Selector und ClusterIssuer schon
+# eingerichtet, und ich wusste nicht, was ein eigener Namespace davon neu
+# braucht. Florian hat die Frage am 07.10.2026 beantwortet: Der Istio-Selector
+# ist derselbe, der ClusterIssuer gilt clusterweit, und das Harbor-Pull-Secret
+# wird in alle Namespaces übertragen. Damit kostet ein eigener Namespace
+# nichts und trennt den Bestand sauber von fremden Anwendungen.
+#
+# Das Label für die Sidecar-Einbindung ist die eine Stelle, die noch nicht
+# gemessen ist: Klassische Istio-Installationen horchen auf
+# `istio-injection: enabled`, revisionsbasierte auf `istio.io/rev: <revision>`.
+# Steht das falsche da, bleibt der Sidecar still weg. Zu prüfen mit
+#
+#   kubectl get ns hackathon-vibe --show-labels
+#   kubectl get pod -n stories    # 2/2 heißt: Sidecar ist da, 1/1 heißt: nicht
+#
+# Die Anwendung läuft auch ohne Sidecar — das Ingress-Gateway erreicht den
+# Dienst dann über die normale Service-Auflösung. Es fehlt mTLS im Cluster,
+# nicht die Funktion.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: stories
+  labels:
+    istio-injection: enabled
+    app.kubernetes.io/part-of: erfolgsgeschichten

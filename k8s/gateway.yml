@@ -13,7 +13,7 @@ apiVersion: networking.istio.io/v1alpha3
 kind: Gateway
 metadata:
   name: erfolgsgeschichten-ingress-gateway
-  namespace: hackathon-vibe
+  namespace: stories
 spec:
   selector:
     istio: ingressgateway-frp
@@ -23,7 +23,7 @@ spec:
         name: http
         protocol: HTTP
       hosts:
-        - "erfolgsgeschichten.mybits.dev"
+        - "stories.mybits.dev"
       tls:
         httpsRedirect: true
     - port:
@@ -34,7 +34,7 @@ spec:
         mode: SIMPLE
         credentialName: erfolgsgeschichten-ingress-cert
       hosts:
-        - "erfolgsgeschichten.mybits.dev"
+        - "stories.mybits.dev"
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
@@ -45,21 +45,24 @@ metadata:
   namespace: istio-system
 spec:
   secretName: erfolgsgeschichten-ingress-cert
-  commonName: "erfolgsgeschichten.mybits.dev"
+  commonName: "stories.mybits.dev"
+  # ClusterIssuer, nicht Issuer: Er gilt clusterweit und ist bereits
+  # eingerichtet (Auskunft Florian, 07.10.2026). Im eigenen Namespace muss
+  # dafuer nichts nachgezogen werden.
   issuerRef:
     name: letsencrypt-mybits-dev
     kind: ClusterIssuer
   dnsNames:
-    - "erfolgsgeschichten.mybits.dev"
+    - "stories.mybits.dev"
 ---
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
   name: erfolgsgeschichten-routing
-  namespace: hackathon-vibe
+  namespace: stories
 spec:
   hosts:
-    - "erfolgsgeschichten.mybits.dev"
+    - "stories.mybits.dev"
   gateways:
     - erfolgsgeschichten-ingress-gateway
   http:
@@ -68,7 +71,7 @@ spec:
             prefix: /
       route:
         - destination:
-            host: erfolgsgeschichten.hackathon-vibe.svc.cluster.local
+            host: erfolgsgeschichten.stories.svc.cluster.local
             port:
               number: 80
       # Ein Import dauert gemessen 87 Sekunden, eine Formulierung 61 — und sie

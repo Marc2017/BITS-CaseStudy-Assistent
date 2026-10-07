@@ -15,7 +15,7 @@ Rollenstufen. Was noch nicht gemessen ist, steht unter „Offene Punkte".
 
 | | Einzelplatz (Vorgabe) | Mehrbenutzer |
 |---|---|---|
-| Wo | lokal, `npm run dev` | im Cluster, hinter Keycloak |
+| Wo | lokal, `npm run dev` | `https://stories.mybits.dev`, hinter Keycloak |
 | Anmeldung | keine | Pflicht (OIDC, `id.mybits.dev`) |
 | Rollen | keine — einer darf alles | Schreiben für alle Angemeldeten, Verwalten mit Rolle |
 | KI-Schlüssel | Verwaltung oder `.env` | **nur** aus der Umgebung (I-08) |
@@ -207,6 +207,10 @@ Kicker nennen „Hotellerie & Reisen".
   schlägt der Workflow fehl.
 - **Es gibt keine Sicherung** (`O-06`): Die Datenbank liegt auf einem
   Datenträger im Cluster und wird nirgends hinkopiert.
+- **Das Istio-Injection-Label ist geraten** (`E-20`): `k8s/namespace.yml`
+  setzt `istio-injection: enabled`; eine revisionsbasierte Installation will
+  `istio.io/rev`. Steht das falsche da, fehlt der Sidecar still — die
+  Anwendung läuft, mTLS im Cluster nicht.
 - **Liegen vertrauliche Fakten sicher?** (`O-05`) Ist der Cluster-Storage
   verschlüsselt, und wer kommt an ein PVC? Eine Frage an Florian.
 - **Azure OpenAI ist vorbereitet, aber ungetestet** (`O-04`) — es gibt noch

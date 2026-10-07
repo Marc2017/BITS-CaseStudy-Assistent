@@ -347,3 +347,45 @@ Verwaltung zu sehen hilft beim Verstehen, und ohne sie wäre die Seite leer.
 Geprüft wird auf Methode **und** Pfad (`brauchtVerwalter()`): `GET` ist
 immer frei, `PUT` auf `/api/verwaltung/*` und `/api/einstellungen` braucht die
 Rolle.
+
+## E-20 — Eigene Adresse, eigener Namespace: `stories.mybits.dev` in `stories`
+
+*07.10.2026 — Adresse auf Wunsch von Marc („den Host würde ich kürzer"),
+Namespace nach Florians Auskunft*
+
+Die Anwendung erreicht man unter **`stories.mybits.dev`** und sie läuft im
+Namespace **`stories`**. Beides war vorher `erfolgsgeschichten…` bzw.
+`hackathon-vibe`.
+
+**Warum die Adresse kürzer ist.** `erfolgsgeschichten.mybits.dev` sind 29
+Zeichen, die jemand tippt, vorliest oder in eine Teams-Nachricht schreibt.
+Es ist derselbe Fall wie auf der Website: Der Gattungsname bleibt
+„Erfolgsgeschichte" — im Werkzeug, in der Oberfläche, in dieser Akte —, aber
+der Pfad dort heißt `/case-studies/`. Eine technische Adresse ist kein
+Sprachbekenntnis.
+
+**Warum ein eigener Namespace.** Vorher lagen die Manifeste in
+`hackathon-vibe`, dem Namespace von bits-burn, und der Grund dafür war
+Unwissen: Dort waren Pull-Secret, Istio-Selector und ClusterIssuer schon
+eingerichtet, und es war offen, was ein eigener Namespace davon neu braucht.
+Florian hat das beantwortet: **Der Istio-Selector ist derselbe, der
+ClusterIssuer gilt clusterweit, und das Harbor-Pull-Secret wird in alle
+Namespaces übertragen.** Damit kostet ein eigener Namespace nichts und
+trennt den Bestand von fremden Anwendungen — was bei einer Datei als
+Datenbank mehr wert ist als bei einem Dienst mit eigenem Zugang.
+
+Ungemessen bleibt eine Stelle: das Label für die Sidecar-Einbindung.
+`k8s/namespace.yml` setzt `istio-injection: enabled`; eine revisionsbasierte
+Istio-Installation will stattdessen `istio.io/rev`. Steht das falsche da,
+bleibt der Sidecar **still** weg — die Anwendung läuft, mTLS im Cluster fehlt.
+Prüfbar mit `kubectl get pod -n stories` (2/2 statt 1/1).
+
+**Was ausdrücklich nicht umbenannt wurde**, weil es nicht die Adresse ist:
+
+| Bleibt | Warum |
+|---|---|
+| Harbor-Projekt `harbor.mybits.dev/erfolgsgeschichten/app` | Florian legt es an; ein zweiter Name wäre eine zweite Absprache |
+| Keycloak-Client-ID `erfolgsgeschichten` | derselbe Grund — Florian legt den Client an |
+| Realm-Rolle `erfolgsgeschichten-verwalter` | steht in Keycloak, in `k8s/config.yml` und in den Tests (E-19) |
+| Objektnamen im Cluster (`erfolgsgeschichten`, `-daten`, `-ingress-cert`, …) | benennen die **Anwendung**, nicht ihre Adresse. Im Namespace `stories` wäre `stories-daten` eine Tautologie |
+| Datenbankdatei `erfolgsgeschichten.db` | eine Umbenennung hieße: Migration des Bestands, ohne Gegenwert |

@@ -5,12 +5,12 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: erfolgsgeschichten
-  namespace: hackathon-vibe
+  namespace: stories
 data:
   NODE_ENV: "production"
   PORT: "4700"
-  AUTH_URL: "https://erfolgsgeschichten.mybits.dev"
-  FRONTEND_URL: "https://erfolgsgeschichten.mybits.dev"
+  AUTH_URL: "https://stories.mybits.dev"
+  FRONTEND_URL: "https://stories.mybits.dev"
 
   # Die Datenbank liegt auf dem Datentraeger, nicht im Image.
   BITS_EG_DB: "/app/server/data/erfolgsgeschichten.db"

@@ -1,4 +1,6 @@
 resources:
+  # Der Namespace zuerst: Die uebrigen Ressourcen liegen darin.
+  - namespace.yml
   - config.yml
   - sealed-secret.yml
   - app.yml

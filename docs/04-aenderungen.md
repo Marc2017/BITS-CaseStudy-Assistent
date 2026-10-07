@@ -241,3 +241,48 @@ Im echten HTTP-Lauf, gegen eine **Kopie** des Bestands:
 
 Das sind drei Messungen, die alle am fehlenden Docker hängen — und die erste
 davon passiert ohnehin im Runner.
+
+---
+
+## 07.10.2026 — Adresse `stories.mybits.dev`, eigener Namespace `stories`
+
+**Warum.** Zwei Anlässe am selben Tag. Marc wollte die Adresse kürzer —
+`erfolgsgeschichten.mybits.dev` sind 29 Zeichen, die jemand vorliest oder in
+eine Teams-Nachricht tippt. Und Florian hat die Frage beantwortet, die bis
+dahin als Punkt 2 in `07-betrieb.md` an ihn gerichtet war: **Istio-Selector
+derselbe, ClusterIssuer clusterweit, Harbor-Pull-Secret wird in alle
+Namespaces übertragen.** Damit fiel der Grund weg, im fremden Namespace
+`hackathon-vibe` (dem von bits-burn) mitzuwohnen — das war Vorsicht aus
+Unwissen, keine Entscheidung.
+
+| Was | Vorher | Jetzt |
+|---|---|---|
+| Adresse | `erfolgsgeschichten.mybits.dev` | `stories.mybits.dev` |
+| Namespace | `hackathon-vibe` | `stories` |
+| Service-FQDN | `…hackathon-vibe.svc.cluster.local` | `erfolgsgeschichten.stories.svc.cluster.local` |
+
+Nicht umbenannt — und das ist der Teil, der später zählt: Harbor-Projekt,
+Keycloak-Client-ID, Realm-Rolle, die Objektnamen im Cluster und die
+Datenbankdatei heißen weiter `erfolgsgeschichten…`. Die ersten drei legt
+Florian an (ein zweiter Name wäre eine zweite Absprache), die Objektnamen
+benennen die Anwendung statt ihrer Adresse, und eine Umbenennung der Datei
+wäre eine Migration ohne Gegenwert. Begründung und Liste: E-20.
+
+**Neu:** `k8s/namespace.yml` bringt den Namespace mit, samt
+`istio-injection: enabled`.
+
+**Gemessen** (`k8s/*.yml` nach PyYAML geladen und gegeneinander geprüft,
+16 Prüfungen): Alle Anwendungsobjekte liegen in `stories`, das Zertifikat
+weiterhin in `istio-system` (dort sucht das Ingress-Gateway seine Secrets);
+Gateway, Certificate und VirtualService nennen **genau einen** Host
+(`stories.mybits.dev`); `credentialName` des Gateways entspricht
+`secretName` des Zertifikats; der VirtualService zeigt auf den FQDN, der sich
+aus Service- und Namespace-Namen ergibt; `AUTH_URL` und `FRONTEND_URL`
+tragen denselben Host.
+
+**Ungemessen bleibt** das Injection-Label: Eine revisionsbasierte
+Istio-Installation will `istio.io/rev` statt `istio-injection: enabled`, und
+steht das falsche da, bleibt der Sidecar **still** weg. Die Anwendung läuft
+dann trotzdem — es fehlt mTLS, nicht die Funktion. Prüfbar am ersten Pod
+(`2/2` statt `1/1`); welches Label `hackathon-vibe` trägt, ist die Frage an
+Florian.
