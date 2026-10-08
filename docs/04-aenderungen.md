@@ -586,3 +586,13 @@ Nachweis der Ursache: Ein hartes Neuladen im Browser zeigte sofort „Fakten 4"
   `05-interview-und-prompts.md`).
 - O-08 (zwei Angaben zu einer Einzelrubrik) und O-09 (Benachrichtigung ohne
   Mail, etwa über Teams) sind benannt, nicht gelöst.
+
+**Nachtrag zur WSL-Falle:** Der Befund vom Vortag hat heute zweimal
+zugeschlagen — die Container waren beim Weiterarbeiten jedes Mal beendet
+(`Exited (143)` bei Keycloak, `Exited (255)` bei der Anwendung). Ursache ist
+nicht Docker, sondern WSL2 selbst: Ohne aktiven Prozess fährt Windows die
+Distribution herunter und nimmt den Daemon mit. `restart: unless-stopped`
+greift dagegen nicht, weil die Regel einen laufenden Daemon voraussetzt. Die
+Abhilfe (ein Terminal offen lassen, oder ein unsichtbarer Autostart-Eintrag
+mit `wsl -d Ubuntu-24.04 -- tail -f /dev/null`) steht jetzt in
+`07-betrieb.md` — bisher stand dort nur der Befund, nicht der Ausweg.

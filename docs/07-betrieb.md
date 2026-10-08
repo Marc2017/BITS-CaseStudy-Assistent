@@ -206,6 +206,34 @@ Server. Wer den Anmeldeweg im Browser prüfen will, beendet also zuerst
 `npm run dev`. Einen anderen Port zu nehmen hilft nicht: Der mitgelieferte
 Realm erlaubt Rücksprünge nur auf `localhost:4700` und `:5273`.
 
+**Die Container sterben, wenn keine WSL-Sitzung mehr offen ist.** Das ist
+keine Fehlkonfiguration, sondern das normale Verhalten von WSL2: Ist kein
+Prozess mehr in der Distribution aktiv, fährt Windows sie nach kurzer Zeit
+herunter — und nimmt den Docker-Daemon mitsamt aller Container mit. Im Log
+sieht man `Exited (143)` (SIGTERM) bei Keycloak und `Exited (255)` bei der
+Anwendung, oft nur Sekunden nach dem letzten `wsl`-Aufruf. Am 08.10.2026
+zweimal passiert, jeweils nach dem Ende der letzten Sitzung.
+
+`restart: unless-stopped` hilft nicht: Die Regel greift erst, wenn der Daemon
+läuft, und der läuft nur, solange die Distribution lebt.
+
+Zwei Wege:
+
+- **Für eine Sitzung:** Ein Terminal mit `wsl` offen lassen. Solange dort
+  eine Shell wartet, bleibt alles oben.
+- **Dauerhaft:** Einen Autostart-Eintrag, der eine unsichtbare Sitzung hält.
+  In der Aufgabenplanung („Bei Anmeldung", Haken „Unabhängig von der
+  Benutzeranmeldung ausführen" NICHT setzen):
+
+  ```
+  powershell.exe -WindowStyle Hidden -Command "wsl -d Ubuntu-24.04 -- tail -f /dev/null"
+  ```
+
+  Danach startet `docker compose up -d` einmal, und die Container überleben
+  Abmelden und Standby, solange der Rechner läuft.
+
+Im Cluster stellt sich die Frage nicht — dort hält Kubernetes die Pods.
+
 **Die Erstausstattung muss niemand einspielen.** Der Server tut es beim
 Start, wenn die Datenbank leer ist (I-09). Ein frisches Volume ist damit
 sofort gesund; `npm run seed` braucht es nur noch für `--ersetzen`.
