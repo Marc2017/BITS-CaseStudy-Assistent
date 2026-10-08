@@ -380,3 +380,70 @@ Der Token-Tausch mit Keycloak. Der Weg ist bis zum Anmeldeformular geprüft
 `client_id=erfolgsgeschichten`), aber eine Anmeldung einzutippen ist
 Zugangsdatenarbeit und bleibt bei Marc. Ebenso die Manifeste: Dafür braucht
 es den Cluster.
+
+---
+
+## 08.10.2026 — F-07: Anmelden ging, Abmelden nicht
+
+**Der Befund** (Marc, im Browser): Die Anmeldung funktioniert, der Klick auf
+„Abmelden" landet auf Keycloaks Seite „We are sorry… Invalid redirect uri".
+
+**Im Keycloak-Log** stand es wörtlich:
+
+```
+type="LOGOUT_ERROR" error="invalid_redirect_uri"
+redirect_uri="http://localhost:4700/"
+```
+
+**Die Ursache** ist eine Trennregel, die nur für dieses eine Feld gilt. Im
+Realm-Import stand
+
+```json
+"post.logout.redirect.uris": "http://localhost:4700/* http://localhost:5273/*"
+```
+
+Keycloak trennt diese Liste mit `##`, nicht mit Leerzeichen. Mit Leerzeichen
+ist es **eine** Adresse — eine, die keine gültige URL ist und darum nie
+passt. Der Anmeldeweg war deshalb in Ordnung: `redirectUris` ist ein echtes
+JSON-Array, und nur diese zweite Liste ist eine Zeichenkette mit eigener
+Regel. Der Fehler sieht nach einem Problem der Anmeldung aus und sitzt in
+einem Feld daneben.
+
+**Gemessen** am Logout-Endpunkt, ohne Admin-Anmeldung (die Seite „Invalid
+redirect uri" gegen eine 302 unterscheiden genügt):
+
+| `post_logout_redirect_uri` | vor der Korrektur | danach |
+|---|---|---|
+| `http://localhost:4700/` | ABGELEHNT | **302 → `http://localhost:4700/`** |
+| `http://localhost:4700` | ABGELEHNT | 302 |
+| `http://localhost:5273/` | ABGELEHNT | 302 |
+| `http://boeswillig.example/` | ABGELEHNT | **ABGELEHNT** |
+
+Die letzte Zeile ist die wichtige: Die Korrektur macht das Feld nicht
+durchlässig, sie macht es wirksam. Der Anmeldeweg bleibt unverändert streng
+(`/auth/callback` akzeptiert, `/` abgelehnt).
+
+**Eine Fehlmessung unterwegs,** die hier stehen bleibt, weil sie lehrreich
+ist: Um die Hypothese zu prüfen, habe ich die wörtliche Zeichenkette
+`http://localhost:4700/* http://localhost:5273/*` als `post_logout_redirect_uri`
+geschickt — in der Erwartung, dass Keycloak sie als „die eine Adresse"
+akzeptiert. Sie wurde abgelehnt, was die Hypothese zu widerlegen schien. Der
+Grund: `curl` kodiert das Leerzeichen als `%20`, und damit war es nicht mehr
+dieselbe Zeichenkette. Bestätigt hat die Hypothese erst die Korrektur selbst.
+
+**Zwei Dinge dagegen:**
+
+- Ein Test prüft den Realm-Import auf Leerzeichen in dieser Liste
+  (`kern.test.ts`). Billig, und er fängt genau die Falle.
+- `07-betrieb.md` warnt bei Florians Keycloak-Aufgabe ausdrücklich: Bleibt
+  das Feld leer, meldet sich jeder an und niemand ab. Der empfohlene Wert
+  ist jetzt `https://stories.mybits.dev/*` mit Sternchen.
+
+**Nebenbefund zum Betrieb:** `id_token_hint` ist nicht nötig — Keycloak
+leitet mit 302 direkt zurück, ohne Bestätigungsseite. Gemessen am
+`Location`-Kopf.
+
+**Nebenbefund zu WSL2:** Die Container sterben, wenn keine WSL-Sitzung mehr
+offen ist (`Exited (143)` = SIGTERM, Keycloak nach sieben Sekunden). Für eine
+Messreihe muss eine Sitzung offenbleiben; für Marc heißt das, ein Terminal
+offen zu lassen. Steht in `07-betrieb.md`.

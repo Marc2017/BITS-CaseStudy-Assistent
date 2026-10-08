@@ -37,7 +37,7 @@
       ],
       "baseUrl": "http://localhost:4700",
       "attributes": {
-        "post.logout.redirect.uris": "http://localhost:4700/* http://localhost:5273/*"
+        "post.logout.redirect.uris": "http://localhost:4700/*##http://127.0.0.1:4700/*##http://localhost:5273/*"
       },
       "defaultClientScopes": [
         "web-origins",

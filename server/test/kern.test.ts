@@ -428,6 +428,35 @@ describe('I-09: die Erstausstattung laeuft nur in eine leere Datenbank', () => {
   });
 });
 
+describe('Keycloak: die Post-Logout-URIs sind ##-getrennt', () => {
+  // Anlass: Der Abmeldeweg endete in Keycloaks „Invalid redirect uri". Im
+  // Realm-Import stand die Liste LEERZEICHEN-getrennt - Keycloak liest das
+  // Attribut dann als EINE URI, die nie passt. Der Anmeldeweg war in
+  // Ordnung, weil `redirectUris` ein echtes JSON-Array ist; nur diese zweite
+  // Liste ist eine Zeichenkette mit eigener Trennregel.
+  it('enthaelt kein Leerzeichen als Trenner', async () => {
+    const { readFileSync } = await import('node:fs');
+    const pfad = new URL(
+      '../../docker/keycloak/realm-import/erfolgsgeschichten-realm.json',
+      import.meta.url,
+    );
+    const realm = JSON.parse(readFileSync(pfad, 'utf8')) as {
+      clients: { clientId: string; attributes?: Record<string, string> }[];
+    };
+    const client = realm.clients.find((c) => c.clientId === 'erfolgsgeschichten');
+    assert.ok(client, 'der Client steht im Realm-Import');
+    const liste = client.attributes?.['post.logout.redirect.uris'] ?? '';
+    assert.ok(liste.length > 0, 'die Liste ist gesetzt - sonst scheitert das Abmelden');
+    assert.ok(
+      !liste.includes(' '),
+      `Leerzeichen in der Liste: ${liste} - Keycloak trennt mit ##`,
+    );
+    for (const u of liste.split('##')) {
+      assert.match(u, /^https?:\/\//, `keine URL: ${u}`);
+    }
+  });
+});
+
 describe('CSS: content-Zeichenketten sind geschlossen', () => {
   // Steht hier, obwohl es das Frontend betrifft: Dies ist die einzige Stelle,
   // an der im Projekt Tests laufen. Anlass war ein gerades " mitten in einem

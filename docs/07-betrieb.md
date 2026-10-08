@@ -146,8 +146,16 @@ für `SESSION_SECRET` (`openssl rand -base64 48`) und
    | Client ID | `erfolgsgeschichten` |
    | Client authentication | ein (confidential) |
    | Valid redirect URIs | `https://stories.mybits.dev/auth/callback` |
-   | Valid post logout redirect URIs | `https://stories.mybits.dev/` |
+   | Valid post logout redirect URIs | `https://stories.mybits.dev/*` |
    | Web origins | `https://stories.mybits.dev` |
+
+   **Das Feld „Valid post logout redirect URIs" darf nicht leer bleiben.**
+   Bleibt es leer, meldet sich jeder an und niemand ab: Keycloak zeigt beim
+   Abmelden „Invalid redirect uri" statt zurückzuleiten. Genau das ist im
+   lokalen Betrieb passiert (F-07) — dort stand die Liste leerzeichen-
+   getrennt und galt damit als eine einzige, nie passende Adresse. In der
+   Admin-Oberfläche ist es ein Listenfeld, da stellt sich die Frage nicht;
+   beim Import über JSON trennt Keycloak mit `##`.
 
 5. **Realm-Rolle** `erfolgsgeschichten-verwalter` anlegen und den Personen
    geben, die Vorlagen, Kunden und den Faktenkatalog pflegen dürfen. Wer
