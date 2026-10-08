@@ -414,3 +414,43 @@ der Server etwas einspielt, das jemand bewusst entfernt hat.
 
 `npm run seed` bleibt als Befehl bestehen, für `--ersetzen` und für den Fall,
 dass jemand den Lieferstand zurückholen will.
+
+## E-22 — Hell ist die Vorgabe, dunkel bleibt, die Wahl gehört der Person
+
+*08.10.2026 — auf Wunsch von Marc („das Layout bitte auf einen hellen Modus
+umstellen, gerne ein Darkmode-Umschalter — individuell für jeden User")*
+
+Das Werkzeug startet **hell**. Ein Umschalter in jeder Kopfzeile wechselt zu
+dunkel, und die Wahl gilt **pro Person und Gerät**.
+
+**Warum nicht in der Datenbank.** Die Wahl liegt in `localStorage`. Sie in
+`setting` zu schreiben hieße: eine Migration, ein Feld je Benutzer, ein
+API-Aufruf bei jedem Klick — für eine Angabe, die niemand vermisst, wenn sie
+verloren geht. Im Einzelplatzbetrieb gibt es zudem keinen Benutzer, an dem
+sie hängen könnte. Der Preis ist bekannt und klein: Wer den Browser wechselt,
+wählt neu.
+
+**Warum der Startwert aus dem System kommt.** Ohne eigene Wahl entscheidet
+`prefers-color-scheme`. Wer seinen Rechner dunkel gestellt hat, bekommt
+dunkel — und wer hier klickt, überschreibt das dauerhaft.
+
+**Eine Palette, ein Ort.** `:root` trägt hell, `:root[data-theme="dark"]`
+dunkel. Ein `@media (prefers-color-scheme: dark)` im CSS gibt es
+**ausdrücklich nicht**: Dann stünde die dunkle Palette zweimal da, und zwei
+Blöcke, die man synchron halten muss, laufen auseinander. Stattdessen setzt
+ein Skript in `index.html` das Attribut immer ausdrücklich — vor dem ersten
+Rendern, damit nicht die falsche Farbe aufblitzt.
+
+**Das Blatt bleibt Papier.** In beiden Themen. Eine Erfolgsgeschichte soll
+aussehen wie das, was sie wird; ein dunkles Blatt wäre eine Programmfläche,
+kein Text. Das kostete eine Anpassung: Im Hellmodus liegt warmes Papier auf
+hellem Grund, und bei fast gleicher Helligkeit verschwimmt beides. Der Grund
+ist darum **kühl** (`#EEF3F9`) und das Blatt hat einen Rahmen — der Farbton
+trennt, wo die Helligkeit es nicht kann.
+
+**Die Kontraste sind gemessen, nicht geschätzt**, und der Test rechnet sie
+aus dem CSS nachträglich nachvollziehbar aus (`kern.test.ts`, „Thema").
+Zwei Werte haben dabei nicht gereicht und wurden geändert: die Trennlinie
+(1.26:1 → 1.36:1) und der Hinweis auf dem leeren Blatt (2.49:1 → 3.71:1).
+Letzterer ist derselbe, dessen CSS-Regel am Vortag repariert wurde (F-05) —
+die Regel wirkte danach, die Farbe trug trotzdem nicht.

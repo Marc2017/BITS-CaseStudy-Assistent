@@ -447,3 +447,48 @@ leitet mit 302 direkt zurück, ohne Bestätigungsseite. Gemessen am
 offen ist (`Exited (143)` = SIGTERM, Keycloak nach sieben Sekunden). Für eine
 Messreihe muss eine Sitzung offenbleiben; für Marc heißt das, ein Terminal
 offen zu lassen. Steht in `07-betrieb.md`.
+
+---
+
+## 08.10.2026 — Helles Thema als Vorgabe, Umschalter in jeder Kopfzeile
+
+Auf Wunsch von Marc. Entscheidung und Begründungen: E-22.
+
+**Was dafür nötig war.** `:root` trug die dunkle Palette, und 19 Farbwerte
+standen hart im CSS — Fehlerbalken, Kopfzeilenverlauf, Hauptknopf,
+Dialogschatten. Genau solche Stellen wären im Hellmodus Löcher geblieben:
+Keiner davon fällt beim Durchklicken auf, jeder einzelne sieht falsch aus,
+wenn man ihn trifft. Alle 19 sind jetzt Variablen, die in beiden Themen
+definiert sind.
+
+**Zwei Tests**, beide lesen die Farben **aus** `stil.css`:
+
+- *Vollständigkeit:* Jede themenabhängige Farbe muss in beiden Blöcken
+  stehen. Wer eine nur oben ergänzt, hat sie im Dunkelmodus in ihrem hellen
+  Wert — der Build merkt das nicht, und wer nur im Hellmodus arbeitet, sieht
+  es nie.
+- *Kontrast:* 16 Paare je Thema plus 6 auf dem Blatt, nach WCAG 2.1
+  (4.5:1 für Text, 3.0:1 für große Schrift und Bedienelemente).
+
+Gegenprobe zu beiden: Das Original-Cyan `#1FC5FF` in den Hellmodus gesetzt →
+der Test nennt `--accent auf --bg = 1.79:1`, `--accent auf --bg-2 = 2.00:1`
+und `--auf-accent auf --accent = 2.00:1`. Eine Farbe nur im Hell-Block
+ergänzt → „im Dunkelmodus nicht definiert". Zurückgesetzt: 31 Tests grün.
+
+**Im Browser nachgesehen** (Vite-Entwicklungsbetrieb, eigene Datenbank im
+Scratchpad — der echte Bestand blieb unberührt), und das hat zwei Dinge
+gefunden, die kein Test findet:
+
+| Befund | Ursache | Behoben |
+|---|---|---|
+| Der Umschalter sah wie ein „C" aus | U+263E (☾) rendert unter Windows als dünner Strich | zwei Inline-SVG-Pfade statt Zeichen |
+| Die leere Faktenspur war ein graues Band | die Marken nutzten `--line`; dreizehn davon nebeneinander wirken gefüllt | eigene Variable `--spur-leer`, im Hellmodus deutlich heller |
+
+Der zweite ist der interessantere: Die Spur zeigt den Fortschritt, und eine
+leere Spur, die gefüllt aussieht, sagt das Gegenteil von dem, was sie soll.
+Auf dunklem Grund war `--line` dafür genau richtig — eine Farbe kann in
+einem Thema stimmen und im anderen die Aussage verdrehen.
+
+**Nachgemessen am Verhalten:** Nach dem Umschalten auf dunkel und einem
+Neuladen der Seite war dunkel noch aktiv — die Wahl übersteht das Neuladen.
+Beide Symbole im Zoom geprüft, Sonne und Mond sind erkennbar.

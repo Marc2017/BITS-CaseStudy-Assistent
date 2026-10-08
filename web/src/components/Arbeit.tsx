@@ -5,7 +5,7 @@ import { api, type StoryVoll } from '../lib/api.ts';
 import { Blatt } from './Blatt.tsx';
 import { Fakten } from './Fakten.tsx';
 import { Gespraech } from './Gespraech.tsx';
-import { Arbeitsanzeige, Fehlerbalken, Spur, useFortgang } from './teile.tsx';
+import { Arbeitsanzeige, Fehlerbalken, Spur, ThemaKnopf, useFortgang } from './teile.tsx';
 
 export function Arbeit(
   { storyId, kiZugang, zurueck, zurVerwaltung }:
@@ -108,6 +108,8 @@ export function Arbeit(
           <button type="button" className="marke" onClick={zurueck}>
             <i /> Erfolgsgeschichten
           </button>
+          <div className="titel" />
+          <ThemaKnopf />
         </div>
         <div className="start"><Fehlerbalken text={fehler} />{!fehler && 'Lädt …'}</div>
       </>
@@ -178,6 +180,7 @@ export function Arbeit(
         >
           {wertetAus ? 'Wertet aus …' : 'Auswerten'}
         </button>
+        <ThemaKnopf />
         <button type="button" className="knopf leise" onClick={zurVerwaltung}>
           Verwaltung
         </button>

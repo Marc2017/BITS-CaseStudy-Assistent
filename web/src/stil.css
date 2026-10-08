@@ -11,39 +11,113 @@
  */
 
 :root {
-  /* Werkstatt */
-  --bg: #0A1626;
-  --bg-2: #0F2138;
-  --bg-3: #142944;
-  --line: #1E3A5C;
-  --line-hell: #2A4E77;
+  /* ----------------------------------------------------------------- Thema
+   *
+   * Vorgabe ist HELL. Die dunkle Palette steht in genau einem Block weiter
+   * unten (`:root[data-theme="dark"]`); welcher gilt, entscheidet das
+   * Skript in `index.html` anhand des Speichers und der
+   * Systemeinstellung - es setzt `data-theme` immer ausdruecklich.
+   *
+   * Wer eine Farbe aendert, aendert sie in BEIDEN Bloecken. Jeder Wert, der
+   * nur hier steht, ist im Dunkelmodus der helle Wert - und dort meist
+   * unlesbar. Die Kontraste sind gemessen, der Test dazu heisst
+   * „Thema: die Kontraste tragen" in `server/test/kern.test.ts`.
+   */
+  color-scheme: light;
 
-  --accent: #1FC5FF;        /* Assistent, Aktionen */
-  --accent-2: #4DE3C2;      /* oeffentlich freigegeben */
-  --accent-3: #6E8BFF;      /* intern */
-  --ph: #FF9F45;            /* Luecke, Warnung */
-  --ph-bg: #3A2412;
-  --rot: #FF6B6B;           /* vertraulich, Fehler */
+  /* Werkstatt. Der Grund ist kuehl und etwas dunkler als das Papier des
+   * Blattes (#FCFBF8, warm): Bei fast gleicher Helligkeit trennt der
+   * Farbton die beiden Flaechen - sonst verschwimmt das Blatt im
+   * Hellmodus mit seiner Umgebung. */
+  --bg: #EEF3F9;
+  --bg-2: #FFFFFF;
+  --bg-3: #E2EAF4;
+  --line: #C9D6E4;
+  --line-hell: #AFC1D4;
 
-  --text: #EAF3FC;
-  --muted: #9FB6CE;
-  --muted-2: #6E88A3;
-  --glow: 0 0 40px -8px var(--accent);
+  /* Das Cyan des Designsystems (#1FC5FF) traegt auf Weiss nur 1.9:1 und ist
+   * als Text unbrauchbar. Im Hellmodus steht derselbe Farbton dunkler. */
+  --accent: #0B6F94;        /* Assistent, Aktionen */
+  --accent-2: #0E7A6B;      /* oeffentlich freigegeben */
+  --accent-3: #3A4FBF;      /* intern */
+  --ph: #A85A06;            /* Luecke, Warnung */
+  --ph-bg: #FDF0DF;
+  --rot: #C0362C;           /* vertraulich, Fehler */
 
-  /* Blatt */
+  --text: #152233;
+  --muted: #556B80;
+  --muted-2: #76889B;
+  --glow: 0 0 40px -8px rgba(11, 111, 148, .22);
+
+  --auf-accent: #FFFFFF;    /* Schrift auf der Akzentflaeche */
+  --accent-hover: #095C7C;  /* im Hellmodus dunkler, nicht heller */
+  --kopf-bg-1: #FFFFFF;     /* obere Haelfte des Kopfzeilen-Verlaufs */
+  --decke: #0A1626A8;       /* Ueberdeckung hinter einem Dialog */
+  --blatt-schein: transparent;
+
+  --knopf-hover-bg: #DCE6F2;
+  --spur-leer: #DBE3ED;
+  --kasten-schatten: rgba(21, 34, 51, .28);
+
+  --fehler-bg: #FDECEC;
+  --fehler-line: #F0B4B4;
+  --fehler-text: #8A1F1F;
+
+  /* Blatt. In BEIDEN Themen gleich: Papier bleibt Papier - eine
+   * Erfolgsgeschichte soll aussehen wie das, was sie wird. */
   --papier: #FCFBF8;
   --papier-2: #F2EFE9;
   --tinte: #16212E;
   --tinte-2: #46586B;
   --papier-line: #DDD7CB;
+  --papier-hinweis: #8A8172;      /* Hinweis auf dem leeren Blatt */
+  --papier-leise: #64717F;        /* Denkschritte auf dem Blatt */
+  --papier-link: #0F6E9C;
+  --papier-luecke-bg: #FFF3E2;    /* sichtbare Luecke im Text */
+  --papier-luecke-text: #8A4B08;
 
   --sans: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", sans-serif;
   --serif: Georgia, "Iowan Old Style", "Times New Roman", serif;
 
   --r: 6px;
   --kopf: 52px;
+}
 
+/* Die dunkle Palette - der Stand, mit dem dieses Werkzeug gebaut wurde. */
+:root[data-theme="dark"] {
   color-scheme: dark;
+
+  --bg: #0A1626;
+  --bg-2: #0F2138;
+  --bg-3: #142944;
+  --line: #1E3A5C;
+  --line-hell: #2A4E77;
+
+  --accent: #1FC5FF;
+  --accent-2: #4DE3C2;
+  --accent-3: #6E8BFF;
+  --ph: #FF9F45;
+  --ph-bg: #3A2412;
+  --rot: #FF6B6B;
+
+  --text: #EAF3FC;
+  --muted: #9FB6CE;
+  --muted-2: #6E88A3;
+  --glow: 0 0 40px -8px var(--accent);
+
+  --auf-accent: #05121F;
+  --accent-hover: #57D6FF;
+  --kopf-bg-1: #0D1C30;
+  --decke: #04101Ccc;
+  --blatt-schein: #16294222;
+
+  --knopf-hover-bg: #17304F;
+  --spur-leer: #1E3A5C;
+  --kasten-schatten: #000000;
+
+  --fehler-bg: #2B1416;
+  --fehler-line: #5C2327;
+  --fehler-text: #FFD9D9;
 }
 
 * { box-sizing: border-box; }
@@ -80,18 +154,21 @@ button, input, select, textarea { font: inherit; color: inherit; }
   cursor: pointer;
   transition: border-color .12s, background .12s;
 }
-.knopf:hover:not(:disabled) { border-color: var(--accent); background: #17304f; }
+.knopf:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--knopf-hover-bg);
+}
 .knopf:disabled { opacity: .45; cursor: default; }
 
 .knopf.haupt {
   background: var(--accent);
   border-color: var(--accent);
-  color: #05121F;
+  color: var(--auf-accent);
   font-weight: 600;
 }
 .knopf.haupt:hover:not(:disabled) {
-  background: #57d6ff;
-  border-color: #57d6ff;
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
 }
 
 .knopf.leise {
@@ -128,12 +205,12 @@ label.zeile > span {
 
 .hinweis { color: var(--muted); font-size: 12.5px; }
 .fehler {
-  background: #2B1416;
-  border: 1px solid #5C2327;
+  background: var(--fehler-bg);
+  border: 1px solid var(--fehler-line);
   border-left: 3px solid var(--rot);
   border-radius: var(--r);
   padding: 9px 12px;
-  color: #FFD9D9;
+  color: var(--fehler-text);
   margin: 8px 0;
 }
 
@@ -146,7 +223,7 @@ label.zeile > span {
   gap: 14px;
   padding: 0 16px;
   border-bottom: 1px solid var(--line);
-  background: linear-gradient(180deg, #0D1C30, var(--bg));
+  background: linear-gradient(180deg, var(--kopf-bg-1), var(--bg));
 }
 
 .marke {
@@ -207,7 +284,10 @@ label.zeile > span {
   width: 7px;
   height: 20px;
   border-radius: 2px;
-  background: var(--line);
+  /* Nicht `--line`: Im Hellmodus ergeben dreizehn Linienfarben nebeneinander
+   * ein graues Band, und die leere Spur sieht gefuellt aus. Die Information
+   * traegt der Unterschied zur gefuellten Marke, nicht die Flaeche. */
+  background: var(--spur-leer);
   transition: background .3s;
 }
 .spur .m.voll { background: var(--accent-2); }
@@ -475,7 +555,7 @@ label.zeile > span {
   overflow-y: auto;
   padding: 22px;
   background:
-    radial-gradient(1200px 300px at 50% -80px, #16294222, transparent),
+    radial-gradient(1200px 300px at 50% -80px, var(--blatt-schein), transparent),
     var(--bg-2);
 }
 
@@ -487,6 +567,9 @@ label.zeile > span {
   color: var(--tinte);
   border-radius: 3px;
   box-shadow: 0 1px 0 #ffffff55 inset, 0 14px 40px -12px #00000099;
+  /* Im Hellmodus traegt der Schatten allein die Trennung nicht - das
+   * Papier liegt dann auf einer fast gleich hellen Flaeche. */
+  border: 1px solid var(--papier-line);
   padding: 40px 46px 56px;
   min-height: 100%;
 }
@@ -519,7 +602,7 @@ label.zeile > span {
 /* Ein leeres Blatt sagt, was zu tun ist. */
 .dok:empty::before {
   content: "Hier schreiben — oder oben „Formulieren“ drücken.";
-  color: #A9A093;
+  color: var(--papier-hinweis);
   font: 14px/1.5 var(--sans);
 }
 .dok h2 {
@@ -545,14 +628,14 @@ label.zeile > span {
   font-style: normal;
   color: var(--tinte-2);
 }
-.dok a { color: #0F6E9C; }
+.dok a { color: var(--papier-link); }
 .dok:focus { outline: none; }
 
 /* Sichtbare Luecke — der Kern von „keine kaschierten Luecken". */
 .dok .fehlt {
-  background: #FFF3E2;
+  background: var(--papier-luecke-bg);
   border-left: 3px solid var(--ph);
-  color: #8A4B08;
+  color: var(--papier-luecke-text);
   padding: 9px 12px;
   margin: 14px 0;
   font: 13.5px/1.5 var(--sans);
@@ -674,7 +757,7 @@ table.tab td.rechts { text-align: right; white-space: nowrap; }
 .decke {
   position: fixed;
   inset: 0;
-  background: #04101Ccc;
+  background: var(--decke);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -688,7 +771,7 @@ table.tab td.rechts { text-align: right; white-space: nowrap; }
   border-radius: 8px;
   width: 100%;
   max-width: 620px;
-  box-shadow: 0 30px 70px -20px #000;
+  box-shadow: 0 30px 70px -20px var(--kasten-schatten);
 }
 .kasten.breit { max-width: 980px; }
 .kasten header {
@@ -821,11 +904,11 @@ table.tab td.rechts { text-align: right; white-space: nowrap; }
 .arbeit.hell .schritt,
 .arbeit.hell .dauer { color: var(--tinte-2); }
 .arbeit.hell .gedanken {
-  color: #7C8A98;
+  color: var(--papier-leise);
   border-left-color: var(--papier-line);
 }
 .arbeit.hell .gedanken > div:last-child { color: var(--tinte-2); }
-.arbeit.hell .denkt { color: #0F6E9C; }
+.arbeit.hell .denkt { color: var(--papier-link); }
 
 /* ------------------------------------------------------------- Teilfragen
  *
@@ -894,3 +977,33 @@ table.tab td.rechts { text-align: right; white-space: nowrap; }
   font-style: normal;
 }
 .wer-ich a { text-decoration: none; }
+
+/* ------------------------------------------------------- Themenumschalter
+ *
+ * Sitzt in jeder Kopfzeile und schaltet zwischen hell und dunkel. Die Wahl
+ * gilt pro Person und pro Gerät (`localStorage`), nicht fuer alle - zwei
+ * Kollegen am selben Werkzeug duerfen unterschiedlich sehen wollen.
+ */
+.thema {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--r);
+  cursor: pointer;
+}
+.thema:hover {
+  color: var(--accent);
+  border-color: var(--line);
+  background: var(--bg-3);
+}
+.thema:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

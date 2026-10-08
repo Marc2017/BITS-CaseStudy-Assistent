@@ -4,6 +4,29 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>BITS Erfolgsgeschichten</title>
+    <script>
+      /* Das Thema steht, bevor React laeuft - sonst blitzt beim Laden die
+       * falsche Farbe auf ("flash of wrong theme").
+       *
+       * `data-theme` wird IMMER ausdruecklich gesetzt. Darum braucht das CSS
+       * kein `@media (prefers-color-scheme)`, und die dunkle Palette steht
+       * an genau einer Stelle. Reihenfolge: eigene Wahl, sonst die
+       * Systemeinstellung, sonst hell.
+       *
+       * Der Zugriff auf localStorage steht in try/catch: Im privaten Fenster
+       * oder bei gesperrten Website-Daten wirft er, und daran soll die
+       * Anwendung nicht haengen. */
+      (function () {
+        var gewaehlt = null;
+        try { gewaehlt = localStorage.getItem('bits-thema'); } catch (e) { /* egal */ }
+        var dunkelGewuenscht = window.matchMedia
+          && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        var thema = gewaehlt === 'dark' || gewaehlt === 'light'
+          ? gewaehlt
+          : (dunkelGewuenscht ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', thema);
+      })();
+    </script>
   </head>
   <body>
     <div id="wurzel"></div>

@@ -13,6 +13,16 @@ Rollenstufen. Das Image ist inzwischen real gebaut und im Container gelaufen;
 unter `https://stories.mybits.dev` soll es stehen. Was noch nicht gemessen
 ist, steht unter „Offene Punkte".
 
+## Hell oder dunkel
+
+Das Werkzeug startet hell. Der Umschalter sitzt in jeder Kopfzeile (Mond
+beziehungsweise Sonne) und wechselt zu dunkel; die Wahl gilt **pro Person und
+pro Gerät** und bleibt beim nächsten Aufruf erhalten. Ohne eigene Wahl
+entscheidet die Einstellung des Betriebssystems.
+
+Das Blatt auf der rechten Seite bleibt in beiden Fällen Papier — eine
+Erfolgsgeschichte soll aussehen wie das, was sie wird (E-22).
+
 ## Zwei Betriebsarten
 
 | | Einzelplatz (Vorgabe) | Mehrbenutzer |

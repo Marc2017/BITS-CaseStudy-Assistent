@@ -8,7 +8,7 @@ import { api, type Ich, type Startdaten } from './lib/api.ts';
 import { Arbeit } from './components/Arbeit.tsx';
 import { Start } from './components/Start.tsx';
 import { Verwaltung } from './components/Verwaltung.tsx';
-import { Fehlerbalken } from './components/teile.tsx';
+import { Fehlerbalken, ThemaKnopf } from './components/teile.tsx';
 
 type Ansicht = { was: 'start' } | { was: 'arbeit'; id: number } | { was: 'verwaltung' };
 
@@ -89,6 +89,7 @@ export function App() {
           </span>
         )}
         {daten && <Wer ich={daten.ich} />}
+        <ThemaKnopf />
         <button type="button" className="knopf" onClick={() => gehe({ was: 'verwaltung' })}>
           Verwaltung
         </button>

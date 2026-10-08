@@ -50,6 +50,12 @@ Datenbank. Ohne das erste wird ein Pod mit frischem Volume nie bereit
 gelöschtes Ziel bei jedem Neustart zurück. Beide Richtungen sind getestet —
 wer eine davon aufgibt, merkt es erst im Cluster oder beim Benutzer.
 
+**Wer eine Farbe anfasst**, fasst zwei Stellen an: `:root` in
+`web/src/stil.css` ist das **helle** Thema, `:root[data-theme="dark"]` das
+dunkle. Eine Farbe, die nur oben steht, gilt im Dunkelmodus in ihrem hellen
+Wert. Beide Tests dazu (`kern.test.ts`, „Thema") lesen die Werte aus dem CSS
+und rechnen die Kontraste selbst — sie fangen das, der Build nicht.
+
 ## Nach der Arbeit nachtragen
 
 Am Ende jeder Sitzung, in der etwas Inhaltliches passiert ist:

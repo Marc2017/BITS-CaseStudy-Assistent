@@ -4,6 +4,76 @@ import {
   STUFEN, stufenName, type Fortgang, type Fortschritt, type Stufe,
 } from '../lib/api.ts';
 
+export type Thema = 'light' | 'dark';
+
+const THEMA_SPEICHER = 'bits-thema';
+
+/** Was gerade gilt - gesetzt vom Skript in `index.html`. */
+function themaJetzt(): Thema {
+  return document.documentElement.getAttribute('data-theme') === 'dark'
+    ? 'dark' : 'light';
+}
+
+/**
+ * Umschalter fuer hell und dunkel.
+ *
+ * Die Wahl gilt **pro Person und Gerät**: Sie liegt in `localStorage`, nicht
+ * in der Datenbank. Zwei Kollegen am selben Werkzeug duerfen
+ * unterschiedlich sehen wollen, und ein Thema ist keine Angabe, die eine
+ * Sicherung oder eine Migration wert ist.
+ *
+ * Der Startwert kommt aus der Systemeinstellung (siehe `index.html`); erst
+ * ein Klick hier schreibt eine eigene Wahl fest.
+ */
+export function ThemaKnopf() {
+  const [thema, setThema] = useState<Thema>(themaJetzt);
+
+  const wechseln = () => {
+    const neu: Thema = thema === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', neu);
+    setThema(neu);
+    try {
+      localStorage.setItem(THEMA_SPEICHER, neu);
+    } catch {
+      // Privates Fenster oder gesperrte Website-Daten: Die Umschaltung
+      // wirkt trotzdem, sie ueberlebt nur das Neuladen nicht.
+    }
+  };
+
+  const hin = thema === 'dark' ? 'Helles Thema' : 'Dunkles Thema';
+  return (
+    <button type="button" className="thema" onClick={wechseln} title={hin} aria-label={hin}>
+      {thema === 'dark' ? <Sonne /> : <Mond />}
+    </button>
+  );
+}
+
+/* Als Pfade, nicht als Zeichen: Die Unicode-Symbole fuer Sonne und Mond
+ * (U+2600, U+263E) rendern je nach Schrift als dünner Strich - der Mond sah
+ * in der Kopfzeile wie ein „C" aus. */
+function Mond() {
+  return (
+    <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" focusable="false">
+      <path
+        fill="currentColor"
+        d="M6.6 1.4a6.6 6.6 0 1 0 8 8.1 5.3 5.3 0 0 1-8-8.1Z"
+      />
+    </svg>
+  );
+}
+
+function Sonne() {
+  return (
+    <svg
+      viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" focusable="false"
+      fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"
+    >
+      <circle cx="8" cy="8" r="3.1" />
+      <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.1 3.1l1.1 1.1M11.8 11.8l1.1 1.1M12.9 3.1l-1.1 1.1M4.2 11.8l-1.1 1.1" />
+    </svg>
+  );
+}
+
 /**
  * Die Faktenspur: eine Marke je Pflichtfakt.
  *

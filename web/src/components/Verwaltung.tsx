@@ -8,7 +8,7 @@ import {
   type Lernnotiz, type Projektart, type Stufe, type Verwaltungsdaten,
   type Ziel,
 } from '../lib/api.ts';
-import { Fehlerbalken } from './teile.tsx';
+import { Fehlerbalken, ThemaKnopf } from './teile.tsx';
 
 type Seite = 'ziele' | 'projektarten' | 'kunden' | 'katalog' | 'gelernt' | 'einstellungen';
 
@@ -46,6 +46,7 @@ export function Verwaltung(
         <div className="titel" style={{ fontWeight: 600, fontSize: 15, paddingLeft: 8 }}>
           Verwaltung
         </div>
+        <ThemaKnopf />
         <button type="button" className="knopf" onClick={zurueck}>Zurück</button>
       </div>
 

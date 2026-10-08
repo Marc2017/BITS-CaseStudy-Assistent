@@ -31,6 +31,12 @@ const {
   ausCookie, cookieWert, sitzung, sitzungAnlegen, sitzungBeenden,
 } = await import('../src/auth/sitzung.ts');
 const { brauchtVerwalter, istVerwalter } = await import('../src/auth/waechter.ts');
+const fsModul = await import('node:fs');
+
+/** `node:fs` synchron - in den Tests oft gebraucht, hier einmal geholt. */
+function requireFs() {
+  return fsModul;
+}
 
 before(() => {
   datenbank();
@@ -425,6 +431,145 @@ describe('I-09: die Erstausstattung laeuft nur in eine leere Datenbank', () => {
       zahl("SELECT COUNT(*) FROM ziel WHERE schluessel = 'angebot'") > 0,
       'und die Ziele ebenfalls',
     );
+  });
+});
+
+describe('Thema: hell und dunkel sind beide vollstaendig', () => {
+  // Die Falle: `:root` traegt die helle Palette, `:root[data-theme="dark"]`
+  // die dunkle. Wer eine Farbe nur oben ergaenzt, hat sie im Dunkelmodus in
+  // ihrem HELLEN Wert - und dort ist sie meist unlesbar. Der Build merkt das
+  // nicht, ein Blick in den Hellmodus auch nicht.
+  const THEMA_FREI = ['--papier', '--tinte', '--sans', '--serif', '--r', '--kopf'];
+
+  function paletten() {
+    const { readFileSync } = requireFs();
+    const css = readFileSync(new URL('../../web/src/stil.css', import.meta.url), 'utf8');
+    const block = (kopf: string) => {
+      const i = css.indexOf(kopf);
+      assert.ok(i >= 0, `Block fehlt: ${kopf}`);
+      const ende = css.indexOf('\n}', i);
+      const roh = css.slice(i, ende);
+      const werte = new Map<string, string>();
+      for (const m of roh.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/g)) {
+        werte.set(m[1], m[2].trim());
+      }
+      return werte;
+    };
+    return { hell: block(':root {'), dunkel: block(':root[data-theme="dark"] {') };
+  }
+
+  it('jede Farbe des Dunkelmodus hat ein helles Gegenstueck', () => {
+    const { hell, dunkel } = paletten();
+    const fehlend = [...dunkel.keys()].filter((k) => !hell.has(k));
+    assert.deepEqual(fehlend, [], 'im Hellmodus nicht definiert');
+  });
+
+  it('jede themenabhaengige Farbe des Hellmodus hat ein dunkles Gegenstueck', () => {
+    const { hell, dunkel } = paletten();
+    const fehlend = [...hell.keys()]
+      .filter((k) => !THEMA_FREI.some((frei) => k.startsWith(frei)))
+      .filter((k) => !dunkel.has(k));
+    assert.deepEqual(fehlend, [], 'im Dunkelmodus nicht definiert - dort gilt der helle Wert');
+  });
+});
+
+describe('Thema: die Kontraste tragen', () => {
+  // WCAG 2.1: 4.5:1 fuer normalen Text, 3.0:1 fuer grosse Schrift und
+  // Bedienelemente. Anlass war ein Hinweis mit 1.4:1, der monatelang
+  // unsichtbar war, und einer mit 2.5:1, der es nach einer Korrektur
+  // beinahe geblieben waere.
+  function leuchte(wert: string): number {
+    const h = wert.replace('#', '').slice(0, 6);
+    const voll = h.length === 3 ? [...h].map((c) => c + c).join('') : h;
+    const teil = (i: number) => {
+      const k = parseInt(voll.slice(i, i + 2), 16) / 255;
+      return k <= 0.04045 ? k / 12.92 : ((k + 0.055) / 1.055) ** 2.4;
+    };
+    return 0.2126 * teil(0) + 0.7152 * teil(2) + 0.0722 * teil(4);
+  }
+
+  function verhaeltnis(a: string, b: string): number {
+    const [la, lb] = [leuchte(a), leuchte(b)];
+    return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+  }
+
+  // [Vordergrund, Hintergrund, Mindestwert, wofuer]
+  const PAARE: [string, string, number, string][] = [
+    ['--text', '--bg', 4.5, 'Grundtext'],
+    ['--text', '--bg-2', 4.5, 'Text in Karten und Feldern'],
+    ['--text', '--bg-3', 4.5, 'Text auf gedeckter Flaeche'],
+    ['--muted', '--bg', 4.5, 'Hinweistext'],
+    ['--muted', '--bg-2', 4.5, 'Hinweis in Karten'],
+    ['--muted-2', '--bg', 3.0, 'Nebenangabe'],
+    ['--accent', '--bg', 4.5, 'Akzent als Text'],
+    ['--accent', '--bg-2', 4.5, 'Akzent in Karten'],
+    ['--auf-accent', '--accent', 4.5, 'Schrift auf dem Hauptknopf'],
+    ['--accent-2', '--bg', 4.5, 'oeffentlich freigegeben'],
+    ['--accent-3', '--bg', 4.5, 'intern'],
+    ['--ph', '--bg', 4.5, 'Luecke und Warnung'],
+    ['--ph', '--ph-bg', 4.5, 'Luecke auf eigener Flaeche'],
+    ['--rot', '--bg', 4.5, 'vertraulich und Fehler'],
+    ['--fehler-text', '--fehler-bg', 4.5, 'Fehlerbalken'],
+    ['--line', '--bg', 1.25, 'Trennlinie - sichtbar, kein Text'],
+  ];
+
+  // Das Blatt ist in beiden Themen Papier, diese Paare gelten immer.
+  const BLATT: [string, string, number, string][] = [
+    ['--tinte', '--papier', 4.5, 'Haupttext auf dem Blatt'],
+    ['--tinte-2', '--papier', 4.5, 'Nebentext auf dem Blatt'],
+    ['--papier-hinweis', '--papier', 3.0, 'Hinweis auf dem leeren Blatt'],
+    ['--papier-leise', '--papier', 4.5, 'Denkschritte auf dem Blatt'],
+    ['--papier-link', '--papier', 4.5, 'Verweis im Blatt'],
+    ['--papier-luecke-text', '--papier-luecke-bg', 4.5, 'sichtbare Luecke'],
+  ];
+
+  function pruefe(
+    name: string, palette: Map<string, string>, paare: [string, string, number, string][],
+  ) {
+    const schlecht: string[] = [];
+    for (const [vg, hg, mindest, wofuer] of paare) {
+      const a = palette.get(vg);
+      const b = palette.get(hg);
+      assert.ok(a && b, `${name}: ${vg} oder ${hg} fehlt`);
+      const v = verhaeltnis(a, b);
+      if (v < mindest) {
+        schlecht.push(`${vg} auf ${hg} = ${v.toFixed(2)}:1 (min ${mindest}) - ${wofuer}`);
+      }
+    }
+    assert.deepEqual(schlecht, [], `${name}: zu schwacher Kontrast`);
+  }
+
+  function paletten() {
+    const { readFileSync } = requireFs();
+    const css = readFileSync(new URL('../../web/src/stil.css', import.meta.url), 'utf8');
+    const block = (kopf: string) => {
+      const i = css.indexOf(kopf);
+      const roh = css.slice(i, css.indexOf('\n}', i));
+      const werte = new Map<string, string>();
+      for (const m of roh.matchAll(/(--[a-z0-9-]+)\s*:\s*(#[0-9a-fA-F]{3,8})\s*;/g)) {
+        werte.set(m[1], m[2]);
+      }
+      return werte;
+    };
+    const hell = block(':root {');
+    const dunkel = new Map(hell);          // das Dunkle erbt, was es nicht neu setzt
+    for (const [k, v] of block(':root[data-theme="dark"] {')) dunkel.set(k, v);
+    return { hell, dunkel };
+  }
+
+  it('im Hellmodus', () => {
+    const { hell } = paletten();
+    pruefe('hell', hell, PAARE);
+  });
+
+  it('im Dunkelmodus', () => {
+    const { dunkel } = paletten();
+    pruefe('dunkel', dunkel, PAARE);
+  });
+
+  it('auf dem Blatt, in beiden Themen', () => {
+    const { hell } = paletten();
+    pruefe('Blatt', hell, BLATT);
   });
 });
 
