@@ -31,6 +31,13 @@ const {
   ausCookie, cookieWert, sitzung, sitzungAnlegen, sitzungBeenden,
 } = await import('../src/auth/sitzung.ts');
 const { brauchtVerwalter, istVerwalter } = await import('../src/auth/waechter.ts');
+const {
+  anfrageAnlegen, anfrageBeenden, anfragenFuer, anfragenZuStory,
+  andereHabenUebersprungen, beteiligte, person, ueberspringen,
+  ueberspringenAufheben, uebersprungeneVon,
+} = await import('../src/db/mitarbeit.ts');
+const { faktenText } = await import('../src/ki/prompts.ts');
+const { mailMoeglich } = await import('../src/mail.ts');
 const fsModul = await import('node:fs');
 
 /** `node:fs` synchron - in den Tests oft gebraucht, hier einmal geholt. */
@@ -431,6 +438,147 @@ describe('I-09: die Erstausstattung laeuft nur in eine leere Datenbank', () => {
       zahl("SELECT COUNT(*) FROM ziel WHERE schluessel = 'angebot'") > 0,
       'und die Ziele ebenfalls',
     );
+  });
+});
+
+describe('I-10: wer etwas beigetragen hat, steht in keinem Prompt', () => {
+  // Seit E-23 haelt jeder Fakt fest, von wem er stammt. Das ist bequem fuer
+  // die Faktenansicht und gefaehrlich fuer die Fassung: Ein
+  // BITS-Mitarbeitername in einer Website-Erfolgsgeschichte ist genau die
+  // Art Panne, gegen die I-04 gebaut wurde.
+  //
+  // `faktenText()` baut seine Zeilen heute aus schluessel, wert, stufe,
+  // sicher und beleg. Wer daraus einmal ein `JSON.stringify(f)` macht - weil
+  // es kuerzer ist - traegt den Namen mit. Dieser Test ist die Bremse.
+  it('faktenText nennt weder Kennung noch Name der Person', () => {
+    const id = storyAnlegen({ arbeitstitel: 'I-10' });
+    faktSetzen(id, {
+      schluessel: 'loesung',
+      wert: 'Eine Schnittstelle zwischen zwei Systemen.',
+      stufe: 'oeffentlich',
+      beigetragen_von: 'keycloak-sub-4711',
+      beigetragen_name: 'Erika Beispiel',
+    });
+
+    const roh = fakten(id);
+    assert.equal(roh[0].beigetragen_name, 'Erika Beispiel', 'im Bestand steht sie');
+
+    for (const stufe of ['oeffentlich', 'intern', 'vertraulich'] as const) {
+      const text = faktenText(faktenFuerZiel(id, stufe));
+      assert.ok(
+        !text.includes('Erika Beispiel'),
+        `Name in der Prompt-Fassung fuer ${stufe}`,
+      );
+      assert.ok(
+        !text.includes('keycloak-sub-4711'),
+        `Kennung in der Prompt-Fassung fuer ${stufe}`,
+      );
+      assert.ok(text.includes('Eine Schnittstelle'), 'der Fakt selbst fehlt');
+    }
+  });
+});
+
+describe('E-23: Ueberspringen gilt je Person, nicht je Geschichte', () => {
+  // Der Kern des ganzen Features. Wer das „je Person" weglaesst, baut eine
+  // Funktion, die das Gegenteil dessen tut, was sie soll: Die Frage
+  // verstummt fuer alle, und der hinzugeholte Kollege wird nie gefragt.
+  const annA = { kennung: 'sub-a', name: 'Anna', email: 'anna@example.test' };
+  const bertB = { kennung: 'sub-b', name: 'Bert', email: 'bert@example.test' };
+
+  it('was A ueberspringt, bleibt fuer B offen', () => {
+    const id = storyAnlegen({ arbeitstitel: 'Weiterreichen' });
+    ueberspringen(id, 'kennzahl', annA, 'kenne die Zahlen nicht');
+
+    assert.deepEqual(uebersprungeneVon(id, annA.kennung), ['kennzahl']);
+    assert.deepEqual(uebersprungeneVon(id, bertB.kennung), [], 'fuer B unberuehrt');
+
+    // Und B bekommt den Hinweis, dass hier jemand passen musste.
+    const fuerB = andereHabenUebersprungen(id, bertB.kennung);
+    assert.deepEqual(fuerB.map((u) => u.schluessel), ['kennzahl']);
+    assert.equal(fuerB[0].person_name, 'Anna');
+    // A selbst braucht diesen Hinweis nicht.
+    assert.deepEqual(andereHabenUebersprungen(id, annA.kennung), []);
+  });
+
+  it('zweimal ueberspringen ist kein Fehler, sondern aktualisiert den Grund', () => {
+    const id = storyAnlegen({ arbeitstitel: 'Zweimal' });
+    ueberspringen(id, 'kennzahl', annA, 'erster Grund');
+    ueberspringen(id, 'kennzahl', annA, 'zweiter Grund');
+    assert.equal(zahl('SELECT COUNT(*) FROM uebersprungen WHERE story_id = ?', id), 1);
+  });
+
+  it('laesst sich zuruecknehmen', () => {
+    const id = storyAnlegen({ arbeitstitel: 'Zurueck' });
+    ueberspringen(id, 'wirkung', annA, null);
+    ueberspringenAufheben(id, 'wirkung', annA);
+    assert.deepEqual(uebersprungeneVon(id, annA.kennung), []);
+  });
+
+  it('haelt fest, von wem eine Angabe stammt', () => {
+    const id = storyAnlegen({ arbeitstitel: 'Beitraege' });
+    faktSetzen(id, {
+      schluessel: 'loesung', wert: 'A weiss das.', stufe: 'oeffentlich',
+      beigetragen_von: annA.kennung, beigetragen_name: annA.name,
+    });
+    faktSetzen(id, {
+      schluessel: 'technologie', wert: 'B weiss das.', stufe: 'oeffentlich',
+      beigetragen_von: bertB.kennung, beigetragen_name: bertB.name,
+    });
+    const wer = beteiligte(id);
+    assert.deepEqual(wer.map((b) => b.name).sort(), ['Anna', 'Bert']);
+  });
+});
+
+describe('E-23: eine Anfrage ueberlebt ohne Mailserver', () => {
+  const chefC = { kennung: 'sub-c', name: 'Cem', email: 'cem@example.test' };
+
+  it('an jemanden, der die Anwendung noch nie geoeffnet hat', () => {
+    // Der haeufigste Fall ueberhaupt - deshalb wird die Adresse NICHT gegen
+    // bekannte Anmeldungen geprueft.
+    const id = storyAnlegen({ arbeitstitel: 'Anfrage' });
+    const a = anfrageAnlegen(
+      id, { an_email: 'Neu.Kollege@Example.test', hinweis: 'Du kennst die Technik.' }, chefC,
+    );
+    assert.equal(a.an_email, 'neu.kollege@example.test', 'Adresse normalisiert');
+    assert.equal(a.status, 'offen');
+    assert.equal(a.von_name, 'Cem');
+    assert.equal(a.mail_versandt, null, 'ohne Mailserver nichts versandt');
+
+    // Sie findet sich ueber die Adresse wieder - eine Kennung hat die Person
+    // noch nicht.
+    const meine = anfragenFuer('neu.kollege@example.test');
+    assert.equal(meine.length, 1);
+    assert.equal(meine[0].arbeitstitel, 'Anfrage', 'mit Arbeitstitel in der Liste');
+  });
+
+  it('dieselbe Person zweimal zu bitten ergibt keine zweite Anfrage', () => {
+    const id = storyAnlegen({ arbeitstitel: 'Doppelt' });
+    anfrageAnlegen(id, { an_email: 'd@example.test', hinweis: 'erst' }, chefC);
+    anfrageAnlegen(id, { an_email: 'd@example.test', hinweis: 'dann' }, chefC);
+    const alle = anfragenZuStory(id);
+    assert.equal(alle.length, 1);
+    assert.equal(alle[0].hinweis, 'dann', 'der Hinweis wird aktualisiert');
+  });
+
+  it('erledigt verschwindet aus meiner Liste, bleibt aber an der Geschichte', () => {
+    const id = storyAnlegen({ arbeitstitel: 'Erledigt' });
+    const a = anfrageAnlegen(id, { an_email: 'e@example.test' }, chefC);
+    anfrageBeenden(a.id, 'erledigt');
+    assert.deepEqual(anfragenFuer('e@example.test'), []);
+    assert.equal(anfragenZuStory(id).length, 1, 'die Spur bleibt');
+    assert.equal(anfragenZuStory(id)[0].status, 'erledigt');
+  });
+
+  it('ohne eingetragenen Server ist Mailversand nicht moeglich', () => {
+    assert.equal(mailMoeglich(), false);
+  });
+
+  it('im Einzelplatzbetrieb gibt es trotzdem eine Person', () => {
+    // Sonst koennte man dort nichts ueberspringen - und „Ueberspringen" ist
+    // auch allein nuetzlich.
+    const p = person(null);
+    assert.ok(p.kennung.length > 0);
+    assert.ok(p.name.length > 0);
   });
 });
 

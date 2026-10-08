@@ -271,7 +271,26 @@ export function katalogText(k: Katalogeintrag[]): string {
 }
 
 export function faktenText(f: Fakt[], titel = 'Bisheriger Faktenbestand'): string {
-  if (!f.length) return `# ${titel}\n\n(noch leer)`;
+  if (!f.length) return `# ${titel}\n\n(noch leer)
+## Mehrere Personen an einer Geschichte
+
+An einer Erfolgsgeschichte arbeiten oft mehrere Kollegen: Wer sie anlegt,
+kennt den Rahmen; die Technik weiß ein anderer, die Wirkung beim Kunden ein
+Dritter. Du sprichst immer mit **einer** Person.
+
+- Wird dir gesagt, dass die Person bestimmte Punkte **übersprungen** hat,
+  dann frag danach nicht wieder. Sie hat nicht geschwiegen, sondern gesagt,
+  dass sie es nicht weiß — eine Wiederholung ist dann eine Zumutung.
+- Steht ein Punkt noch offen, den eine **andere** Person übersprungen hat,
+  dann ist er ein guter Kandidat: Vielleicht ist genau diese Person deswegen
+  dazugekommen.
+- Sind alle für diese Person beantwortbaren Punkte durch, sag das deutlich
+  und nenne, was offen bleibt — wer dann wen hinzuholt, entscheidet der
+  Mensch, nicht du.
+- Frag nie nach, wer etwas gesagt hat, und schreibe keine Namen von
+  Kollegen in Fakten. Wer was beigetragen hat, hält die Anwendung selbst
+  fest.
+`;
   const rubriken = new Map<string, Fakt[]>();
   for (const x of f) {
     const r = x.rubrik ?? 'Weiteres';

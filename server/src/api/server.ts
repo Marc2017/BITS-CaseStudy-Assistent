@@ -43,6 +43,13 @@ fuege('DELETE', '/api/storys/:id',                   r.storyWeg);
 
 fuegeStrom('POST', '/api/storys/:id/interview',         r.interview);
 fuege('POST',   '/api/storys/:id/notiz',             r.notiz);
+
+// Mitarbeit (E-23). Schreiben darf jeder Angemeldete - eine Erfolgsgeschichte
+// zu fuellen ist der Zweck des Werkzeugs, nicht ein Verwaltungsvorgang.
+fuege('POST',   '/api/storys/:id/anfragen',          r.anfrageNeu);
+fuege('PATCH',  '/api/anfragen/:id',                 r.anfragePatch);
+fuege('POST',   '/api/storys/:id/ueberspringen',     r.frageUeberspringen);
+fuege('DELETE', '/api/storys/:id/ueberspringen/:schluessel', r.frageWiederStellen);
 fuegeStrom('POST', '/api/storys/:id/zerlegen',        r.frageZerlegen);
 fuegeStrom('POST', '/api/storys/:id/beispielantwort', r.frageBeispiel);
 

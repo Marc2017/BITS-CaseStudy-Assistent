@@ -7,6 +7,9 @@ import { faktenText, INTERVIEWER, katalogText } from './prompts.ts';
 import { fakten, faktSetzen, fortschritt, katalog } from '../db/fakten.ts';
 import { nachrichtAnlegen, story, verlauf } from '../db/story.ts';
 import { kunde, projektart } from '../db/vorlagen.ts';
+import {
+  andereHabenUebersprungen, person, uebersprungeneVon, type Person,
+} from '../db/mitarbeit.ts';
 
 const StufeSchema = z.enum(['oeffentlich', 'intern', 'vertraulich']);
 
@@ -47,10 +50,15 @@ export interface SchrittErgebnis extends Interview {
  * der Aufruf ab, ist die Antwort trotzdem nicht verloren.
  */
 export async function interviewSchritt(
-  storyId: number, nutzerText?: string, melder: Melder = STILL,
+  storyId: number, nutzerText?: string, melder: Melder = STILL, wer?: Person,
 ): Promise<SchrittErgebnis> {
   const s = story(storyId);
   if (!s) throw new Error(`Erfolgsgeschichte ${storyId} gibt es nicht.`);
+
+  // Wer hier antwortet, entscheidet, was gefragt wird (E-23): Was DIESE
+  // Person uebersprungen hat, wird nicht wiederholt - fuer die naechste
+  // Person steht dieselbe Frage weiter offen.
+  const ich = wer ?? person(null);
 
   if (nutzerText?.trim()) nachrichtAnlegen(storyId, 'nutzer', nutzerText.trim());
 
@@ -59,6 +67,12 @@ export async function interviewSchritt(
   const kd = kunde(s.kunde_id);
   const bestand = fakten(storyId);
   const stand = fortschritt(storyId);
+  const meineLuecken = new Set(uebersprungeneVon(storyId, ich.kennung));
+  const fremdeLuecken = andereHabenUebersprungen(storyId, ich.kennung)
+    .filter((u) => !meineLuecken.has(u.schluessel));
+  // Offen UND fuer diese Person nicht uebersprungen - das ist der Vorrat,
+  // aus dem die naechste Frage kommen soll.
+  const offenFuerMich = stand.offen.filter((o) => !meineLuecken.has(o.schluessel));
 
   // Stabiler Teil: Rollenanweisung + Katalog. Aendert sich nur, wenn der
   // Katalog gepflegt wird - deshalb zwischenspeicherbar.
@@ -88,9 +102,26 @@ export async function interviewSchritt(
     faktenText(bestand),
     '',
     `# Stand: ${stand.pflichtErfuellt} von ${stand.pflicht} Pflichtfakten`,
-    stand.offen.length
-      ? `Es fehlen noch: ${stand.offen.map((o) => `${o.label} (\`${o.schluessel}\`)`).join(', ')}`
-      : 'Alle Pflichtfakten liegen vor.',
+    offenFuerMich.length
+      ? `Es fehlen noch: ${offenFuerMich.map((o) => `${o.label} (\`${o.schluessel}\`)`).join(', ')}`
+      : stand.offen.length
+        ? 'Alles, was offen ist, hat diese Person übersprungen.'
+        : 'Alle Pflichtfakten liegen vor.',
+    '',
+    `# Wer gerade antwortet\n\n${ich.name}`,
+    meineLuecken.size
+      ? `\nDiese Person hat gesagt, dass sie Folgendes nicht beantworten kann — `
+        + `frag nicht danach: ${[...meineLuecken].map((k) => `\`${k}\``).join(', ')}`
+      : null,
+    fremdeLuecken.length
+      ? `\nFolgendes hat jemand anderes nicht beantworten können — vielleicht `
+        + `weiß diese Person es: `
+        + fremdeLuecken.map((u) => `\`${u.schluessel}\``).join(', ')
+      : null,
+    offenFuerMich.length === 0 && stand.offen.length > 0
+      ? '\nSag deutlich, dass für diese Person nichts mehr zu holen ist, und '
+        + 'nenne, was offen bleibt — damit jemand entscheiden kann, wen er dazuholt.'
+      : null,
   ].filter((z) => z !== null).join('\n');
 
   const runden: Runde[] = verlauf(storyId)
@@ -116,6 +147,8 @@ export async function interviewSchritt(
       beleg: f.beleg,
       sicher: f.sicher,
       quelle: 'interview',
+      beigetragen_von: ich.kennung,
+      beigetragen_name: ich.name,
     })) neue += 1;
   }
 

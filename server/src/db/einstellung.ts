@@ -29,6 +29,15 @@ export const SCHLUESSEL = {
 
   /** Wer sitzt hier? Die ehrliche Vorstufe zur Anmeldung (O-01). */
   ichBin: 'ich.person',
+
+  // Mailversand fuer Anfragen (E-24). Optional: Ohne `mailHost` und
+  // `mailAbsender` gibt es die Anfrage weiterhin, nur eben ohne Mail.
+  mailHost: 'mail.host',
+  mailPort: 'mail.port',
+  mailSicher: 'mail.sicher',
+  mailBenutzer: 'mail.benutzer',
+  mailPasswort: 'mail.passwort',
+  mailAbsender: 'mail.absender',
 } as const;
 
 /**
@@ -44,10 +53,18 @@ const UMGEBUNG: Record<string, string | undefined> = {
   [SCHLUESSEL.azureDeployment]: 'AZURE_OPENAI_DEPLOYMENT',
   [SCHLUESSEL.azureVersion]: 'AZURE_OPENAI_VERSION',
   [SCHLUESSEL.anbieter]: 'BITS_EG_KI_ANBIETER',
+  [SCHLUESSEL.mailHost]: 'BITS_EG_MAIL_HOST',
+  [SCHLUESSEL.mailPort]: 'BITS_EG_MAIL_PORT',
+  [SCHLUESSEL.mailSicher]: 'BITS_EG_MAIL_SICHER',
+  [SCHLUESSEL.mailBenutzer]: 'BITS_EG_MAIL_BENUTZER',
+  [SCHLUESSEL.mailPasswort]: 'BITS_EG_MAIL_PASSWORT',
+  [SCHLUESSEL.mailAbsender]: 'BITS_EG_MAIL_ABSENDER',
 };
 
 /** Einstellungen, die niemals im Klartext ausgeliefert werden. */
-const GEHEIM = new Set<string>([SCHLUESSEL.apiKey, SCHLUESSEL.azureKey]);
+const GEHEIM = new Set<string>([
+  SCHLUESSEL.apiKey, SCHLUESSEL.azureKey, SCHLUESSEL.mailPasswort,
+]);
 
 export function lesen(schluessel: string): string | null {
   return eine<{ wert: string | null }>(
@@ -88,6 +105,11 @@ export interface EinstellungAnzeige {
 /** Welche Schluessel im Mehrbenutzerbetrieb nur aus der Umgebung kommen (I-08). */
 export const NUR_UMGEBUNG_SCHLUESSEL = new Set<string>([
   SCHLUESSEL.apiKey,
+  // Ein SMTP-Passwort ist ein Zugang wie ein API-Schluessel: In der Datei
+  // waere es fuer jeden lesbar, der an die Datei kommt, und ueber die
+  // Oberflaeche koennte es jeder Angemeldete austauschen - und damit den
+  // Absender unseres Hauses uebernehmen.
+  SCHLUESSEL.mailPasswort,
   SCHLUESSEL.azureKey,
   SCHLUESSEL.azureEndpunkt,
   SCHLUESSEL.azureDeployment,

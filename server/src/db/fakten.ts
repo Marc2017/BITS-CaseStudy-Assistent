@@ -47,6 +47,16 @@ export interface Fakt {
   sort: number;
   erstellt_am: string;
   geaendert_am: string;
+  /**
+   * Wer die Angabe beigetragen hat (E-23).
+   *
+   * METADATEN. `faktenText()` baut seine Zeilen aus `schluessel`, `wert`,
+   * `stufe`, `sicher` und `beleg` - diese zwei Felder sind dort NICHT
+   * dabei, und das ist Absicht (I-10): Ein BITS-Mitarbeitername gehoert in
+   * keine Fassung, am wenigsten in die fuer die Website.
+   */
+  beigetragen_von: string | null;
+  beigetragen_name: string | null;
 }
 
 /** Der vollstaendige Bestand einer Geschichte - ungefiltert. */
@@ -77,6 +87,9 @@ export interface FaktEingabe {
   quelle?: 'interview' | 'import' | 'manuell';
   beleg?: string | null;
   sicher?: boolean;
+  /** Wer die Angabe beigetragen hat (E-23) - Metadaten, kein Inhalt. */
+  beigetragen_von?: string | null;
+  beigetragen_name?: string | null;
 }
 
 /**
@@ -88,6 +101,9 @@ export interface FaktEingabe {
  * angehaengt, aber ein wortgleicher Wert nicht doppelt.
  */
 export function faktSetzen(storyId: number, e: FaktEingabe): number {
+  // `beigetragen_*` sind METADATEN. Sie gehen nicht durch
+  // `faktenFuerZiel()` in einen Prompt (I-04) - ein BITS-Mitarbeitername
+  // hat in einer Website-Fassung nichts zu suchen.
   const wert = e.wert.trim();
   if (!wert) return 0;
   const stufe = stufeOderIntern(e.stufe);
@@ -109,19 +125,23 @@ export function faktSetzen(storyId: number, e: FaktEingabe): number {
     if (alt.wert.trim() === wert) return alt.id;
     schreib(
       `UPDATE fakt SET wert = ?, stufe = ?, beleg = COALESCE(?, beleg),
-          sicher = ?, quelle = ?, geaendert_am = datetime('now')
+          sicher = ?, quelle = ?, geaendert_am = datetime('now'),
+          beigetragen_von = COALESCE(?, beigetragen_von),
+          beigetragen_name = COALESCE(?, beigetragen_name)
         WHERE id = ?`,
       wert, stufe, e.beleg ?? null, e.sicher === false ? 0 : 1,
-      e.quelle ?? 'interview', alt.id,
+      e.quelle ?? 'interview',
+      e.beigetragen_von ?? null, e.beigetragen_name ?? null, alt.id,
     );
     return alt.id;
   }
 
   const { id } = schreib(
-    `INSERT INTO fakt (story_id, schluessel, rubrik, wert, stufe, quelle, beleg, sicher, sort)
-     VALUES (?,?,?,?,?,?,?,?, (SELECT COALESCE(MAX(sort),0)+1 FROM fakt WHERE story_id = ?))`,
+    `INSERT INTO fakt (story_id, schluessel, rubrik, wert, stufe, quelle, beleg, sicher, sort, beigetragen_von, beigetragen_name)
+     VALUES (?,?,?,?,?,?,?,?, (SELECT COALESCE(MAX(sort),0)+1 FROM fakt WHERE story_id = ?),?,?)`,
     storyId, e.schluessel, rubrik, wert, stufe,
     e.quelle ?? 'interview', e.beleg ?? null, e.sicher === false ? 0 : 1, storyId,
+    e.beigetragen_von ?? null, e.beigetragen_name ?? null,
   );
   return id;
 }

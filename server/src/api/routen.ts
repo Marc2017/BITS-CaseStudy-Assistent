@@ -24,6 +24,12 @@ import {
   anbieter, fehlerText, klientVerwerfen, modell, zugangVorhanden,
 } from '../ki/anbieter.ts';
 import { interviewSchritt } from '../ki/interview.ts';
+import {
+  anfrage, anfrageAnlegen, anfrageBeenden, anfragenFuer, anfragenZuStory,
+  bekannteAdressen, beteiligte, mailVermerken, person, ueberspringen,
+  ueberspringenAufheben, uebersprungeneAlle,
+} from '../db/mitarbeit.ts';
+import { anfrageText, mailMoeglich, senden } from '../mail.ts';
 import { formulieren, textUmformulieren } from '../ki/formulierung.ts';
 import { importieren } from '../ki/importieren.ts';
 import { auswerten } from '../ki/lernmodus.ts';
@@ -137,7 +143,11 @@ export function start(_k: Kontext) {
     // Oberflaeche muss nicht nur wissen, WER hier arbeitet, sondern auch, was
     // er darf.
     ich: ich(_k),
-    betrieb: { mehrbenutzer: mehrbenutzer() },
+    betrieb: { mehrbenutzer: mehrbenutzer(), mail: mailMoeglich() },
+    // Was andere von MIR wollen. Ueber die Adresse, nicht ueber die
+    // Kennung - die Bitte entsteht oft, bevor die Person je angemeldet war
+    // (E-23).
+    anfragen: anfragenFuer(_k.sitzung?.email ?? null),
   };
 }
 
@@ -218,6 +228,14 @@ export function storyVoll(k: Kontext) {
       freigegeben: faktenFuerZiel(id, z.stufe).length,
     })),
     katalog: katalog(),
+    // Mitarbeit (E-23): wer gebeten wurde, was wer uebersprungen hat, und
+    // von wem die Angaben stammen.
+    anfragen: anfragenZuStory(id),
+    uebersprungen: uebersprungeneAlle(id),
+    beteiligte: beteiligte(id),
+    adressen: bekannteAdressen(),
+    mail_moeglich: mailMoeglich(),
+    ich_kennung: person(k.sitzung).kennung,
     projektarten: projektarten(),
     kunden: kunden(),
   };
@@ -260,7 +278,9 @@ export async function interview(k: Kontext) {
   const id = nr(k, 'id');
   const strom = stromOeffnen(k.antwort!);
   try {
-    const ergebnis = await interviewSchritt(id, text(k, 'text'), strom.melder);
+    const ergebnis = await interviewSchritt(
+      id, text(k, 'text'), strom.melder, person(k.sitzung),
+    );
     strom.fertig({ ...ergebnis, verlauf: verlauf(id), fakten: fakten(id) });
   } catch (e) {
     strom.fehler(fehlerText(e));
@@ -606,4 +626,95 @@ export function einstellungenSetzen(k: Kontext) {
     einstellungen: anzeige(),
     ki: { zugang: zugangVorhanden(), anbieter: anbieter(), modell: modell() },
   };
+}
+
+// ------------------------------------------------------------------ Mitarbeit
+//
+// Mehrere Personen an einer Erfolgsgeschichte (E-23). Der Kern ist das
+// Ueberspringen: Es gilt je PERSON, damit dieselbe Frage bei der naechsten
+// wieder gestellt wird.
+
+/**
+ * Einen Kollegen um Mithilfe bitten.
+ *
+ * Die Anfrage wird ZUERST gespeichert, die Mail danach versucht. Scheitert
+ * der Versand, bleibt die Bitte bestehen und der Grund steht an ihr - sonst
+ * waere eine Anfrage bei jedem Netzproblem verloren, ohne dass es jemand
+ * merkt.
+ */
+export async function anfrageNeu(k: Kontext) {
+  const id = nr(k, 'id');
+  const s = story(id);
+  if (!s) throw new Fehlerhaft(`Erfolgsgeschichte ${id} gibt es nicht.`);
+
+  const a = anfrageAnlegen(id, {
+    an_email: pflicht(k, 'an_email'),
+    an_name: text(k, 'an_name') ?? null,
+    hinweis: text(k, 'hinweis') ?? null,
+  }, person(k.sitzung));
+
+  let mailFehler: string | null = null;
+  if (k.body.mail === true) {
+    if (!mailMoeglich()) {
+      mailFehler = 'Es ist kein Mailserver eingetragen.';
+    } else {
+      const auftrag = anfrageText({
+        vonName: a.von_name,
+        arbeitstitel: s.arbeitstitel,
+        hinweis: a.hinweis,
+        link: `${frontendBasis()}/#/story/${id}`,
+      });
+      mailFehler = await senden({ ...auftrag, an: a.an_email });
+    }
+    mailVermerken(a.id, mailFehler);
+  }
+
+  return {
+    anfrage: anfrage(a.id),
+    anfragen: anfragenZuStory(id),
+    // Der Link zum Weitergeben - er funktioniert immer, auch ohne Mail.
+    link: `${frontendBasis()}/#/story/${id}`,
+    mail_fehler: mailFehler,
+  };
+}
+
+/** Wohin der Link zeigt. */
+function frontendBasis(): string {
+  return (process.env.FRONTEND_URL || process.env.AUTH_URL || 'http://localhost:4700')
+    .replace(/\/+$/, '');
+}
+
+export function anfragePatch(k: Kontext) {
+  const id = nr(k, 'id');
+  const a = anfrage(id);
+  if (!a) throw new Fehlerhaft(`Anfrage ${id} gibt es nicht.`);
+  const status = text(k, 'status');
+  if (status !== 'erledigt' && status !== 'abgelehnt') {
+    throw new Fehlerhaft('Status muss „erledigt" oder „abgelehnt" sein.');
+  }
+  anfrageBeenden(id, status);
+  return { anfrage: anfrage(id), anfragen: anfragenFuer(k.sitzung?.email ?? null) };
+}
+
+/**
+ * „Das kann ich nicht beantworten."
+ *
+ * Vermerkt fuer DIESE Person. Fuer alle anderen bleibt die Frage offen - das
+ * ist der ganze Sinn, denn sonst waere Weiterreichen wertlos.
+ */
+export function frageUeberspringen(k: Kontext) {
+  const id = nr(k, 'id');
+  if (!story(id)) throw new Fehlerhaft(`Erfolgsgeschichte ${id} gibt es nicht.`);
+  const schluessel = pflicht(k, 'schluessel');
+  ueberspringen(id, schluessel, person(k.sitzung), text(k, 'grund') ?? null);
+  return {
+    uebersprungen: uebersprungeneAlle(id),
+    fortschritt: fortschritt(id),
+  };
+}
+
+export function frageWiederStellen(k: Kontext) {
+  const id = nr(k, 'id');
+  ueberspringenAufheben(id, k.params.schluessel ?? '', person(k.sitzung));
+  return { uebersprungen: uebersprungeneAlle(id) };
 }

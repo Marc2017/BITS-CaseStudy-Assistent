@@ -147,6 +147,58 @@ const SCHRITTE: Schritt[] = [
       `);
     },
   },
+
+  {
+    version: 5,
+    name: 'Mehrere Personen an einer Erfolgsgeschichte',
+    ausfuehren(db) {
+      // Eine Erfolgsgeschichte entsteht selten in einem Kopf: Wer sie anlegt,
+      // kennt den Rahmen; die Technik weiss ein anderer, die Wirkung beim
+      // Kunden ein Dritter (E-23).
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS anfrage (
+          id            INTEGER PRIMARY KEY,
+          story_id      INTEGER NOT NULL REFERENCES story(id) ON DELETE CASCADE,
+          an_email      TEXT NOT NULL,                  -- auch an jemanden, der die
+          an_name       TEXT,                           -- Anwendung noch nie geoeffnet hat
+          von_kennung   TEXT NOT NULL,
+          von_name      TEXT NOT NULL,
+          hinweis       TEXT,                           -- worum es geht, in eigenen Worten
+          status        TEXT NOT NULL DEFAULT 'offen',  -- offen | erledigt | abgelehnt
+          mail_versandt TEXT,                           -- Zeitpunkt, oder NULL
+          mail_fehler   TEXT,                           -- Grund, wenn der Versand scheiterte
+          erstellt_am   TEXT NOT NULL DEFAULT (datetime('now')),
+          beendet_am    TEXT
+        );
+        CREATE INDEX IF NOT EXISTS anfrage_an ON anfrage(an_email, status);
+        CREATE INDEX IF NOT EXISTS anfrage_story ON anfrage(story_id, status);
+        
+        CREATE TABLE IF NOT EXISTS uebersprungen (
+          id            INTEGER PRIMARY KEY,
+          story_id      INTEGER NOT NULL REFERENCES story(id) ON DELETE CASCADE,
+          schluessel    TEXT NOT NULL,
+          -- Je PERSON, nicht je Geschichte: Was der eine nicht weiss, weiss die
+          -- naechste. Eine Frage, die fuer alle verstummt, waere das Gegenteil des
+          -- Zwecks (E-23).
+          person        TEXT NOT NULL,
+          person_name   TEXT,
+          grund         TEXT,
+          erstellt_am   TEXT NOT NULL DEFAULT (datetime('now')),
+          UNIQUE (story_id, schluessel, person)
+        );
+        CREATE INDEX IF NOT EXISTS uebersprungen_story ON uebersprungen(story_id, person);
+      `);
+      // Wer eine Angabe beigetragen hat. METADATEN, kein Fakteninhalt: Das
+      // Feld geht nicht in einen Formulierungs-Prompt (I-04) - ein
+      // BITS-Mitarbeitername hat auf der Website nichts zu suchen.
+      if (!hatSpalte(db, 'fakt', 'beigetragen_von')) {
+        db.exec('ALTER TABLE fakt ADD COLUMN beigetragen_von TEXT');
+      }
+      if (!hatSpalte(db, 'fakt', 'beigetragen_name')) {
+        db.exec('ALTER TABLE fakt ADD COLUMN beigetragen_name TEXT');
+      }
+    },
+  },
 ];
 
 export interface Ergebnis {

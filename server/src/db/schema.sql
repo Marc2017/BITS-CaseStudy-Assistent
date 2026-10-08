@@ -92,6 +92,10 @@ CREATE TABLE IF NOT EXISTS story (
   herkunft      TEXT NOT NULL DEFAULT 'interview'
                 CHECK (herkunft IN ('interview','import')),
   quelle        TEXT,
+  -- Wer die Angabe beigetragen hat (E-23). Metadaten, kein Inhalt:
+  -- geht NIE in einen Formulierungs-Prompt (I-04).
+  beigetragen_von  TEXT,
+  beigetragen_name TEXT,
   erstellt_am   TEXT NOT NULL DEFAULT (datetime('now')),
   geaendert_am  TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -195,3 +199,42 @@ CREATE TABLE IF NOT EXISTS sitzung (
   ablauf        TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS sitzung_ablauf ON sitzung(ablauf);
+
+
+-- ------------------------------------------------- Mehrere Personen (E-23)
+--
+-- Eine Anfrage bittet einen Kollegen, am Interview mitzuwirken; sie kann
+-- weitergegeben werden, und mehrere koennen gleichzeitig offen sein.
+-- `uebersprungen` haelt fest, was EINE Person nicht beantworten konnte -
+-- die naechste wird trotzdem gefragt.
+CREATE TABLE IF NOT EXISTS anfrage (
+  id            INTEGER PRIMARY KEY,
+  story_id      INTEGER NOT NULL REFERENCES story(id) ON DELETE CASCADE,
+  an_email      TEXT NOT NULL,                  -- auch an jemanden, der die
+  an_name       TEXT,                           -- Anwendung noch nie geoeffnet hat
+  von_kennung   TEXT NOT NULL,
+  von_name      TEXT NOT NULL,
+  hinweis       TEXT,                           -- worum es geht, in eigenen Worten
+  status        TEXT NOT NULL DEFAULT 'offen',  -- offen | erledigt | abgelehnt
+  mail_versandt TEXT,                           -- Zeitpunkt, oder NULL
+  mail_fehler   TEXT,                           -- Grund, wenn der Versand scheiterte
+  erstellt_am   TEXT NOT NULL DEFAULT (datetime('now')),
+  beendet_am    TEXT
+);
+CREATE INDEX IF NOT EXISTS anfrage_an ON anfrage(an_email, status);
+CREATE INDEX IF NOT EXISTS anfrage_story ON anfrage(story_id, status);
+
+CREATE TABLE IF NOT EXISTS uebersprungen (
+  id            INTEGER PRIMARY KEY,
+  story_id      INTEGER NOT NULL REFERENCES story(id) ON DELETE CASCADE,
+  schluessel    TEXT NOT NULL,
+  -- Je PERSON, nicht je Geschichte: Was der eine nicht weiss, weiss die
+  -- naechste. Eine Frage, die fuer alle verstummt, waere das Gegenteil des
+  -- Zwecks (E-23).
+  person        TEXT NOT NULL,
+  person_name   TEXT,
+  grund         TEXT,
+  erstellt_am   TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (story_id, schluessel, person)
+);
+CREATE INDEX IF NOT EXISTS uebersprungen_story ON uebersprungen(story_id, person);
