@@ -1007,3 +1007,90 @@ table.tab td.rechts { text-align: right; white-space: nowrap; }
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
+
+/* ------------------------------------------------- Mitarbeit (E-23/E-24)
+ *
+ * „Für mich angefragt" steht auf der Startseite VOR der eigenen Arbeit: Wer
+ * gebeten wurde, soll die Bitte nicht suchen müssen. Darum ein eigener
+ * Rahmen mit Akzentkante statt einer weiteren Tabelle unter vielen.
+ */
+.angefragt {
+  margin: 22px 0 6px;
+  padding: 14px 16px 6px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r);
+}
+.angefragt h2 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--accent);
+  letter-spacing: .02em;
+}
+
+/* Anfragen und übersprungene Punkte: Zeile, Beschreibung links, Aktion rechts. */
+.anfrageliste {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+.anfrageliste > li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+/* Auswahl der Punkte, die jemand nicht beantworten kann. */
+.auswahl {
+  list-style: none;
+  margin: 6px 0 12px;
+  padding: 0;
+  max-height: 46vh;
+  overflow: auto;
+}
+.auswahl > li { padding: 3px 0; }
+
+/* Ein Haken mit Text daneben - nicht darüber wie bei `label.zeile`. */
+label.haken {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  margin: 2px 0 12px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+label.haken input { margin: 0; }
+
+/* Felder im Dialog nehmen die volle Breite. `label.zeile` gibt nur
+ * `display: block` vor - ohne das hier bleibt ein Textfeld so schmal wie
+ * sein Inhaltsvorschlag, und die Eingabe wird zur Zumutung. */
+.kasten label.zeile input,
+.kasten label.zeile textarea,
+.kasten label.zeile select {
+  width: 100%;
+  box-sizing: border-box;
+}
+.kasten label.zeile textarea { resize: vertical; min-height: 64px; }
+
+/* Etwas ist schiefgegangen, aber nichts ist verloren - deshalb nicht rot. */
+.warnung {
+  margin: 10px 0;
+  padding: 9px 11px;
+  background: var(--ph-bg);
+  border: 1px solid var(--ph);
+  border-radius: var(--r);
+  color: var(--ph);
+  font-size: 13px;
+}
+
+/* Wer beigetragen und wer übersprungen hat - unter dem Faktenbestand. */
+.beteiligte {
+  margin: 16px 2px 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.beteiligte p { margin: 3px 0; }

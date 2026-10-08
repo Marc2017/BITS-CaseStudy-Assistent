@@ -330,6 +330,7 @@ export function notiz(k: Kontext) {
 
 export function faktNeu(k: Kontext) {
   const id = nr(k, 'id');
+  const wer = person(k.sitzung);
   faktSetzen(id, {
     schluessel: pflicht(k, 'schluessel').toLowerCase().replace(/[^a-z0-9_]/g, '_'),
     wert: pflicht(k, 'wert'),
@@ -337,6 +338,10 @@ export function faktNeu(k: Kontext) {
     beleg: text(k, 'beleg') ?? null,
     sicher: k.body.sicher === undefined ? true : Boolean(k.body.sicher),
     quelle: 'manuell',
+    // Wer von Hand eintraegt, hat beigetragen (E-23) - sonst stuende eine
+    // Herkunft nur an Interview-Fakten, und das sieht aus wie ein Fehler.
+    beigetragen_von: wer.kennung,
+    beigetragen_name: wer.name,
   });
   return { fakten: fakten(id), fortschritt: fortschritt(id) };
 }

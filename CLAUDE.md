@@ -50,6 +50,23 @@ Datenbank. Ohne das erste wird ein Pod mit frischem Volume nie bereit
 gelöschtes Ziel bei jedem Neustart zurück. Beide Richtungen sind getestet —
 wer eine davon aufgibt, merkt es erst im Cluster oder beim Benutzer.
 
+**Wer an der Faktenstruktur arbeitet**, kennt neben I-04 auch **I-10**:
+`fakt.beigetragen_von` und `fakt.beigetragen_name` sind Metadaten und gehen
+in **keinen** Prompt. `faktenText()` baut seine Zeilen aus fünf benannten
+Feldern — wer daraus ein `JSON.stringify(f)` macht, trägt einen
+BITS-Mitarbeiternamen in eine Website-Fassung, und niemand merkt es, bis sie
+beim Kunden liegt.
+
+**Wer am Überspringen arbeitet:** Es gilt **je Person** (E-23). Ein
+übersprungener Punkt verstummt nur für die Person, die ihn übersprungen hat;
+für alle anderen bleibt er offen. Wer das „je Person" aufgibt, baut das
+Gegenteil der Funktion — der hinzugeholte Kollege wird dann nie gefragt.
+
+**Wer eine JSON-Antwort schreibt**, nimmt `JSON_KOPF` aus `api/server.ts`.
+Er trägt `Cache-Control: no-store`; ohne ihn darf ein Browser die Antwort
+zwischenspeichern, und bei mehreren Beteiligten sieht einer einen veralteten
+Stand (F-08).
+
 **Wer eine Farbe anfasst**, fasst zwei Stellen an: `:root` in
 `web/src/stil.css` ist das **helle** Thema, `:root[data-theme="dark"]` das
 dunkle. Eine Farbe, die nur oben steht, gilt im Dunkelmodus in ihrem hellen

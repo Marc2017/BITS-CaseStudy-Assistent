@@ -19,7 +19,10 @@ interface Teilfrage {
 }
 
 export function Gespraech(
-  { storyId, verlauf, fakten, laeuft, kiZugang, senden, reif, beginnen, stand, fehler }:
+  {
+    storyId, verlauf, fakten, laeuft, kiZugang, senden, reif, beginnen, stand,
+    fehler, ueberspringen,
+  }:
   {
     storyId: number;
     verlauf: Nachricht[];
@@ -31,6 +34,8 @@ export function Gespraech(
     beginnen: () => void;
     stand: FortgangStand;
     fehler: (t: string) => void;
+    /** Oeffnet die Auswahl „was ich nicht beantworten kann" (E-23). */
+    ueberspringen: () => void;
   },
 ) {
   const [text, setText] = useState('');
@@ -313,6 +318,16 @@ export function Gespraech(
               title="Entwirft eine wahrscheinliche Antwort zum Prüfen und Anpassen"
             >
               Antwort vorschlagen
+            </button>
+            {/* Nicht ausgegraut, wenn die KI fehlt: Ueberspringen ist eine
+                Notiz in der Datenbank und braucht kein Modell. */}
+            <button
+              type="button"
+              className="knopf leise"
+              onClick={ueberspringen}
+              title="Punkte vermerken, die du nicht beantworten kannst — sie bleiben für andere offen"
+            >
+              Kann ich nicht beantworten
             </button>
           </div>
           <span>{text.length > 0 ? `${text.length} Zeichen · Strg + Enter sendet` : 'Strg + Enter sendet'}</span>

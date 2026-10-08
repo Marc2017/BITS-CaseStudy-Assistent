@@ -13,6 +13,25 @@ Rollenstufen. Das Image ist inzwischen real gebaut und im Container gelaufen;
 unter `https://stories.mybits.dev` soll es stehen. Was noch nicht gemessen
 ist, steht unter „Offene Punkte".
 
+## Mehrere Personen an einer Geschichte
+
+Niemand weiß alles über ein Projekt. Darum:
+
+- **Kollegen fragen.** In der Arbeitsansicht bittest du jemanden um Mithilfe
+  — mit Adresse und einem Satz, worum es geht. Die Bitte erscheint bei ihm
+  unter „Für mich angefragt"; den Link zur Geschichte kannst du zusätzlich
+  selbst weitergeben. Wer gefragt wurde, darf weiterfragen.
+- **„Kann ich nicht beantworten."** Punkte, die du nicht weißt, vermerkst du
+  — der Assistent fragt **dich** nicht mehr danach. Für alle anderen bleiben
+  sie offen, und wer als Nächster kommt, sieht sogar, dass hier schon jemand
+  passen musste. Genau darin liegt der Nutzen des Weiterreichens.
+- **Herkunft.** Jeder Fakt hält fest, von wem er stammt. In der
+  Faktenansicht steht unten, wer beigetragen und wer was übersprungen hat.
+
+Eine E-Mail geht zusätzlich raus, wenn in der Verwaltung ein Mailserver
+eingetragen ist (Verwaltung → Einstellungen → Mailserver). Ohne Server
+funktioniert alles andere unverändert.
+
 ## Hell oder dunkel
 
 Das Werkzeug startet hell. Der Umschalter sitzt in jeder Kopfzeile (Mond

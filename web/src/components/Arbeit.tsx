@@ -6,6 +6,7 @@ import { Blatt } from './Blatt.tsx';
 import { Fakten } from './Fakten.tsx';
 import { Gespraech } from './Gespraech.tsx';
 import { Arbeitsanzeige, Fehlerbalken, Spur, ThemaKnopf, useFortgang } from './teile.tsx';
+import { AnfrageKasten, UeberspringenKasten } from './Mitarbeit.tsx';
 
 export function Arbeit(
   { storyId, kiZugang, zurueck, zurVerwaltung }:
@@ -13,6 +14,8 @@ export function Arbeit(
 ) {
   const [daten, setDaten] = useState<StoryVoll | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
+  // Zwei Kaesten fuer die Mitarbeit (E-23): fragen und ueberspringen.
+  const [kasten, setKasten] = useState<null | 'fragen' | 'ueberspringen'>(null);
   const [reiter, setReiter] = useState<'gespraech' | 'fakten'>('gespraech');
   const [laeuft, setLaeuft] = useState(false);
   const [reif, setReif] = useState(false);
@@ -174,6 +177,16 @@ export function Arbeit(
         <button
           type="button"
           className="knopf leise"
+          onClick={() => setKasten('fragen')}
+          title="Einen Kollegen bitten, Fragen zu beantworten, die du nicht beantworten kannst"
+        >
+          Kollegen fragen
+          {daten.anfragen.filter((a) => a.status === 'offen').length > 0
+            && ` (${daten.anfragen.filter((a) => a.status === 'offen').length})`}
+        </button>
+        <button
+          type="button"
+          className="knopf leise"
           onClick={auswerten}
           disabled={wertetAus || laeuft || !kiZugang}
           title="Lernmodus: auswerten, welche Fragen gefehlt haben"
@@ -230,6 +243,7 @@ export function Arbeit(
             <Gespraech
               storyId={storyId}
               fehler={setFehler}
+              ueberspringen={() => setKasten('ueberspringen')}
               verlauf={daten.verlauf}
               fakten={daten.fakten}
               laeuft={laeuft}
@@ -245,11 +259,36 @@ export function Arbeit(
               fakten={daten.fakten}
               stand={daten.fortschritt}
               katalog={daten.katalog}
+              beteiligte={daten.beteiligte}
+              uebersprungen={daten.uebersprungen}
               aktualisieren={(f, s) => setDaten((d) => (d ? { ...d, fakten: f, fortschritt: s } : d))}
               fehler={setFehler}
             />
           )}
         </div>
+
+        {kasten === 'fragen' && (
+          <AnfrageKasten
+            storyId={storyId}
+            anfragen={daten.anfragen}
+            adressen={daten.adressen}
+            mailMoeglich={daten.mail_moeglich}
+            zu={() => setKasten(null)}
+            neuLaden={laden}
+            fehler={setFehler}
+          />
+        )}
+        {kasten === 'ueberspringen' && (
+          <UeberspringenKasten
+            storyId={storyId}
+            offen={daten.fortschritt.offen}
+            uebersprungen={daten.uebersprungen}
+            ichKennung={daten.ich_kennung}
+            zu={() => setKasten(null)}
+            neuLaden={laden}
+            fehler={setFehler}
+          />
+        )}
 
         <div
           className="griff"

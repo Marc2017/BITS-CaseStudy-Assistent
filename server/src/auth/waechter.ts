@@ -110,7 +110,12 @@ export function pruefen(
     // eine Fetch-Anfrage würde die Anmeldeseite in den Fetch laden, nicht in
     // das Fenster.
     if (pfad.startsWith('/api/')) {
-      res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.writeHead(401, {
+        'Content-Type': 'application/json; charset=utf-8',
+        // Eine zwischengespeicherte 401 ist besonders tueckisch: Sie bleibt
+        // bestehen, nachdem die Anmeldung geklappt hat (F-08).
+        'Cache-Control': 'no-store',
+      });
       res.end(JSON.stringify({
         fehler: 'Nicht angemeldet.',
         anmelden: '/auth/login',
@@ -124,7 +129,12 @@ export function pruefen(
   }
 
   if (brauchtVerwalter(req.method ?? 'GET', pfad)) {
-    res.writeHead(403, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.writeHead(403, {
+        'Content-Type': 'application/json; charset=utf-8',
+        // Eine zwischengespeicherte 401 ist besonders tueckisch: Sie bleibt
+        // bestehen, nachdem die Anmeldung geklappt hat (F-08).
+        'Cache-Control': 'no-store',
+      });
     res.end(JSON.stringify({
       fehler: `Dafür braucht es die Rolle „${verwalterRolle()}". `
         + 'Erfolgsgeschichten schreiben darf jeder Angemeldete; Vorlagen, '

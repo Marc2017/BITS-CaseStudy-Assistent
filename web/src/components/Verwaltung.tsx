@@ -513,6 +513,24 @@ const BESCHRIFTUNG: Record<string, { name: string; hinweis: string; typ?: string
   'ki.azure_deployment': { name: 'Azure-Deployment', hinweis: 'Name des Deployments.' },
   'ki.azure_version': { name: 'Azure API-Version', hinweis: 'Leer = 2026-02-01.' },
   'ich.person': { name: 'Ich bin', hinweis: 'Wird als Autor an neue Erfolgsgeschichten geschrieben.' },
+
+  // Mailversand fuer Anfragen (E-24). Ohne Server und Absender bleibt der
+  // Haken „auch per E-Mail" verborgen - die Anfrage selbst funktioniert
+  // trotzdem.
+  'mail.host': {
+    name: 'Mailserver',
+    hinweis: 'Rechnername des SMTP-Servers. Leer = kein Mailversand; Anfragen '
+      + 'erscheinen dann nur in der Anwendung.',
+  },
+  'mail.port': { name: 'Mail-Port', hinweis: 'Leer = 587 (STARTTLS). 465 für TLS ab der ersten Zeile.' },
+  'mail.sicher': { name: 'Mail-TLS sofort', hinweis: '1 bei Port 465, 0 bei 587. Leer = aus dem Port geraten.' },
+  'mail.benutzer': { name: 'Mail-Benutzer', hinweis: 'Leer, wenn der Server ohne Anmeldung sendet.' },
+  'mail.passwort': { name: 'Mail-Passwort', hinweis: 'Im Mehrbenutzerbetrieb nur über die Umgebung (I-08).', typ: 'password' },
+  'mail.absender': {
+    name: 'Absenderadresse',
+    hinweis: 'Was im Von-Feld steht, etwa "BITS Erfolgsgeschichten '
+      + '<noreply@mybits.de>". Ohne Absender wird nicht gesendet.',
+  },
 };
 
 function Einstellungen(

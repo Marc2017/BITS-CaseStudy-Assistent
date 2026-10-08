@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { api, datum, type Startdaten } from '../lib/api.ts';
 import { Arbeitsanzeige, Fehlerbalken, Kasten, useFortgang } from './teile.tsx';
+import { MeineAnfragen } from './Mitarbeit.tsx';
 
 type Weg = null | 'neu' | 'import';
 
@@ -52,6 +53,10 @@ export function Start(
             </span>
           </button>
         </div>
+
+        {/* Was andere von mir wollen, steht VOR der eigenen Arbeit: Wer
+            gebeten wurde, soll es nicht suchen müssen (E-23). */}
+        <MeineAnfragen anfragen={daten.anfragen} oeffnen={oeffnen} />
 
         <div className="liste">
           <h2>In Arbeit</h2>

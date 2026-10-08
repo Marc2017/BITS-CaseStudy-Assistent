@@ -14,6 +14,22 @@ const hier = dirname(fileURLToPath(import.meta.url));
 const WEB_DIST = join(hier, '..', '..', '..', 'web', 'dist');
 const PORT = Number(process.env.PORT ?? 4700);
 
+/**
+ * Der Kopf jeder JSON-Antwort.
+ *
+ * `no-store` ist kein Beiwerk: Ohne `Cache-Control` darf ein Browser eine
+ * GET-Antwort nach eigenem Ermessen zwischenspeichern (RFC 9111, heuristic
+ * freshness). Gemessen am 08.10.2026: Die API lieferte vier Fakten, die
+ * Oberflaeche zeigte nach einem Neuladen drei. Sobald zwei Kollegen an
+ * derselben Erfolgsgeschichte arbeiten (E-23), ist das kein Schoenheitsfehler
+ * mehr - dann haelt einer von beiden einen veralteten Stand fuer den
+ * aktuellen.
+ */
+const JSON_KOPF = {
+  'Content-Type': 'application/json; charset=utf-8',
+  'Cache-Control': 'no-store',
+} as const;
+
 type Handler = (k: r.Kontext) => unknown;
 interface Route { methode: string; muster: string[]; handler: Handler; strom?: boolean }
 
@@ -191,7 +207,7 @@ const server = createServer(async (req, res) => {
       });
       // Strom-Routen haben selbst geantwortet.
       if (route.strom) return;
-      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.writeHead(200, JSON_KOPF);
       res.end(JSON.stringify(daten ?? { ok: true }));
     } catch (e) {
       const status = e instanceof r.Fehlerhaft ? 400 : 500;
@@ -206,13 +222,13 @@ const server = createServer(async (req, res) => {
         }
         return;
       }
-      res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.writeHead(status, JSON_KOPF);
       res.end(JSON.stringify({ fehler: meldung }));
     }
     return;
   }
 
-  res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.writeHead(404, JSON_KOPF);
   res.end(JSON.stringify({ fehler: `Kein Endpunkt für ${req.method} ${url.pathname}.` }));
 });
 

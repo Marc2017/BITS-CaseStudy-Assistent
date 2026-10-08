@@ -492,3 +492,97 @@ einem Thema stimmen und im anderen die Aussage verdrehen.
 **Nachgemessen am Verhalten:** Nach dem Umschalten auf dunkel und einem
 Neuladen der Seite war dunkel noch aktiv — die Wahl übersteht das Neuladen.
 Beide Symbole im Zoom geprüft, Sonne und Mond sind erkennbar.
+
+---
+
+## 08.10.2026 — Mehrere Personen an einer Erfolgsgeschichte
+
+Auf Wunsch von Marc. Entscheidungen: E-23 (Mitarbeit), E-24 (Mailversand).
+Neue Invariante: I-10. Migration M-5.
+
+**Vorher gab es die Funktion nicht** — belegt, nicht vermutet: `story.autor`
+war ein reines Textfeld, es gab keine Zuweisung, keine Einladung, kein
+Überspringen, und `fakt` hielt nicht fest, von wem eine Angabe kam. Was
+schon trug: Mehrere Angemeldete konnten dieselbe Geschichte öffnen, und
+Rubriken mit `mehrfach` nehmen beliebig viele Werte.
+
+**Was gebaut wurde**
+
+| Teil | Wo |
+|---|---|
+| Anfragen, Überspringen, Herkunft | `db/mitarbeit.ts` (neu), Migration 5 |
+| Interview je Person | `ki/interview.ts`, `INTERVIEWER` in `ki/prompts.ts` |
+| Mailversand, optional | `mail.ts` (neu), sechs Einstellungen |
+| Vier Endpunkte | `api/routen.ts`, `api/server.ts` |
+| Oberfläche | `components/Mitarbeit.tsx` (neu), Einbau in Start, Arbeit, Gespräch, Fakten |
+
+**Gemessen**
+
+Schema (I-07): Frische Datenbank und eine Kopie des echten Bestands (Stand 3
+→ 5) landen auf identischem Schema — gleiche Tabellen, Spalten, Indexe.
+
+I-08 für das SMTP-Passwort: `aenderbar('mail.passwort')` ist im
+Mehrbenutzerbetrieb `false`, `aenderbar('mail.host')` ist `true`. Ein
+Passwort ist ein Zugang, ein Rechnername nicht.
+
+I-10 mit Gegenprobe: Name in `faktenText()` mitausgegeben → 40 grün, 1 rot,
+mit der genauen Stelle; zurückgesetzt → 41/0.
+
+Im Browser durchgeklickt (eigene Datenbank im Scratchpad, der echte Bestand
+blieb unberührt): Anfrage an `oliver.kollege@mybits.de` angelegt, Hinweis
+übernommen, Link zum Weitergeben erschienen, Zähler in der Kopfzeile auf
+„Kollegen fragen (1)". Zwei Punkte als „kann ich nicht beantworten" vermerkt
+— in der Datenbank stehen sie mit Kennung, Namen und Grund, und die
+Faktenansicht zeigt unten „Übersprungen: Technologie oder Werkzeug
+(Marc Schallehn: war nur in der Konzeptphase dabei) · Projektrolle (…)".
+
+**Zwei Befunde aus dem Durchklicken**, die kein Test gefunden hätte:
+
+- Die Felder im Dialog waren **so schmal wie ihr Platzhalter**. `label.zeile`
+  gibt nur `display: block` vor; im Kasten fehlte die Breitenangabe. Ein
+  dreizeiliges Textfeld von 70 Pixeln Breite ist keine Eingabe, sondern eine
+  Zumutung.
+- Von Hand eingetragene Fakten bekamen **keine Herkunft** — `faktNeu()`
+  setzte sie nicht. In der Faktenansicht hätte eine Herkunft dann nur an
+  Interview-Fakten gestanden, was wie ein Fehler aussieht.
+
+### F-08 — Die API verbot das Zwischenspeichern nicht (behoben)
+
+**Der Befund** fiel beim Durchklicken auf: Die API lieferte vier Fakten, die
+Oberfläche zeigte nach einem vollen Neuladen drei.
+
+**Die Ursache:** Die JSON-Antworten trugen keinen `Cache-Control`-Kopf. Ohne
+ihn darf ein Browser eine GET-Antwort nach eigenem Ermessen
+zwischenspeichern (RFC 9111, „heuristic freshness") — und genau das war
+passiert. Nur der Ereignisstrom hatte einen Kopf.
+
+**Warum das mit E-23 wichtig wird:** Im Einzelplatz merkt man es kaum, weil
+man seine eigenen Änderungen über die Antwort des eigenen Aufrufs
+zurückbekommt. Sobald zwei Kollegen an derselben Geschichte arbeiten, sieht
+einer von beiden einen veralteten Stand — und hält ihn für den aktuellen.
+
+**Behoben:** Ein `JSON_KOPF` mit `Cache-Control: no-store` für alle vier
+JSON-Antwortstellen in `server.ts`, und derselbe Kopf an den beiden
+401-Antworten des Wächters. Eine zwischengespeicherte 401 ist besonders
+tückisch: Sie bliebe bestehen, nachdem die Anmeldung geklappt hat.
+
+**Gemessen:** `/api/gesund`, `/api/storys/1` und `/api/start` antworten mit
+`Cache-Control: no-store`; die 401 im Mehrbenutzerbetrieb ebenfalls. Und der
+Nachweis der Ursache: Ein hartes Neuladen im Browser zeigte sofort „Fakten 4"
+— der alte Stand kam aus dem Zwischenspeicher, den es vorher geben durfte.
+
+### Was offen bleibt
+
+- **Die Liste „Für mich angefragt" ist im Browser ungemessen.** Sie zeigt
+  Anfragen an die eigene Adresse, und im Einzelplatzbetrieb hat die Person
+  keine. Dafür bräuchte es zwei angemeldete Kollegen — also Zugangsdaten, die
+  ich nicht eingebe. Durch Tests gedeckt (`anfragenFuer()`), nicht durch
+  einen Klick.
+- **Der Mailversand ist ungemessen.** Es gibt keinen SMTP-Zugang; gemessen
+  ist nur, dass `mailMoeglich()` ohne Server `false` liefert und der Haken
+  dann verborgen bleibt.
+- **Dass die drei Mitarbeits-Angaben im Interview-Prompt landen**, ist durch
+  Lesen geprüft, nicht durch einen Lauf mit echter KI (siehe
+  `05-interview-und-prompts.md`).
+- O-08 (zwei Angaben zu einer Einzelrubrik) und O-09 (Benachrichtigung ohne
+  Mail, etwa über Teams) sind benannt, nicht gelöst.

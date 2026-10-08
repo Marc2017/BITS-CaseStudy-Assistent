@@ -136,6 +136,25 @@ zurück; das ist der gewollte Ausgang.
 Test: `kern.test.ts`, „I-09" — ein gelöschtes Ziel bleibt gelöscht, eine
 leere Datenbank wird gefüllt.
 
+### I-10 — Wer etwas beigetragen hat, steht in keinem Prompt
+
+Seit E-23 hält jeder Fakt fest, von wem er stammt (`fakt.beigetragen_von`,
+`fakt.beigetragen_name`). Diese Felder sind **Metadaten** und gehen in
+**keinen** Formulierungs-Prompt.
+
+Der Grund ist derselbe wie bei I-04, nur die Richtung ist neu: Ein
+BITS-Mitarbeitername in einer Website-Erfolgsgeschichte ist genau die Panne,
+gegen die die Vertraulichkeitsfilterung gebaut wurde — nur dass er diesmal
+nicht aus dem Faktenbestand kommt, sondern aus dem Feld daneben.
+
+`faktenText()` in `ki/prompts.ts` baut seine Zeilen aus genau fünf Feldern:
+`schluessel`, `wert`, `stufe`, `sicher`, `beleg`. Wer daraus ein
+`JSON.stringify(f)` macht — weil es kürzer ist — trägt den Namen mit, und
+niemand merkt es, bis eine Fassung bei einem Kunden liegt.
+
+Test: `kern.test.ts`, „I-10". Er prüft alle drei Zielstufen. Gegenprobe
+gemacht: Name in `faktenText()` mitausgegeben → der Test nennt die Stelle.
+
 ### I-06 — Ohne Fakten wird nicht formuliert
 
 Eine Formulierung mit leerem oder fast leerem Faktenbestand wird abgewiesen,
@@ -306,3 +325,44 @@ Zu M-2 zwei Anmerkungen, die beim nächsten Mal Zeit sparen:
 `schema.sql` erreicht **bestehende** Datenbanken nie. Ab dem Moment, in dem
 echte Geschichten in der Datei stehen, ist `db/migration.ts` der einzige
 erlaubte Weg, das Schema zu ändern.
+
+---
+
+## M-5 — Mehrere Personen an einer Erfolgsgeschichte (08.10.2026)
+
+`PRAGMA user_version` 4 → 5. Zwei neue Tabellen und zwei Spalten:
+
+```sql
+CREATE TABLE anfrage (
+  id, story_id, an_email, an_name, von_kennung, von_name, hinweis,
+  status,           -- offen | erledigt | abgelehnt
+  mail_versandt,    -- Zeitpunkt oder NULL
+  mail_fehler,      -- Grund, wenn der Versand scheiterte
+  erstellt_am, beendet_am
+);
+
+CREATE TABLE uebersprungen (
+  id, story_id, schluessel,
+  person,           -- die Kennung, NICHT nur die Geschichte
+  person_name, grund, erstellt_am,
+  UNIQUE (story_id, schluessel, person)
+);
+
+ALTER TABLE fakt ADD COLUMN beigetragen_von  TEXT;
+ALTER TABLE fakt ADD COLUMN beigetragen_name TEXT;
+```
+
+**Das `UNIQUE` über drei Spalten ist die Invariante im Schema:** Dieselbe
+Person kann denselben Punkt nicht zweimal überspringen (der zweite Aufruf
+aktualisiert den Grund), zwei Personen können denselben Punkt sehr wohl
+überspringen — und genau das muss möglich sein (E-23).
+
+**Die Person im Einzelplatzbetrieb:** Dort gibt es keine Anmeldung. Die
+Kennung kommt aus der Einstellung `ich.person`
+(`einzelplatz:<name in Kleinbuchstaben>`), und fehlt die, ist sie
+`einzelplatz`. Damit funktioniert Überspringen auch ohne Anmeldung, ohne eine
+Person zu erfinden (`mitarbeit.ts → person()`).
+
+Gemessen (I-07): Eine frische Datenbank und eine **Kopie des echten
+Bestands** (die auf Stand 3 stand und über 4 nach 5 migrierte) landen auf
+identischem Schema — gleiche Tabellen, gleiche Spalten, gleiche Indexe.

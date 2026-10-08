@@ -215,3 +215,39 @@ die Vorgabe `omitted`, und dann kommen leere Denkblöcke an.
 Die Denkschritte kamen im ersten Lauf auf **Englisch** — das Modell denkt in
 seiner Arbeitssprache. Da sie dem Nutzer angezeigt werden, steht die Bitte um
 Deutsch jetzt in `REDAKTION` und gilt damit für jeden Prompt.
+
+---
+
+## Wenn mehrere Personen antworten (E-23)
+
+Der Assistent spricht immer mit **einer** Person. Der wechselnde Teil des
+Interview-Prompts sagt ihm, mit welcher — und was sie nicht weiß:
+
+```
+# Wer gerade antwortet
+
+Anna Beispiel
+
+Diese Person hat gesagt, dass sie Folgendes nicht beantworten kann —
+frag nicht danach: `kennzahl`, `nutzen_intern`
+
+Folgendes hat jemand anderes nicht beantworten können — vielleicht weiß
+diese Person es: `technologie`
+```
+
+Dazu ist die Liste der offenen Punkte gefiltert: Sie enthält nur, was für
+**diese** Person noch offen ist. Sind alle für sie beantwortbaren Punkte
+durch, bekommt das Modell die Anweisung, das deutlich zu sagen und zu nennen,
+was offen bleibt — wer dann wen dazuholt, entscheidet der Mensch.
+
+Im `INTERVIEWER`-Block (dem stabilen, zwischengespeicherten Teil) steht die
+Regel dazu: Eine übersprungene Frage nicht wiederholen („Sie hat nicht
+geschwiegen, sondern gesagt, dass sie es nicht weiß — eine Wiederholung ist
+dann eine Zumutung"), und **keine Kollegennamen in Fakten schreiben** — wer
+was beigetragen hat, hält die Anwendung selbst fest (I-10).
+
+**Ungemessen:** Dass diese drei Angaben im Prompt landen, ist nicht durch
+einen Test gedeckt — die Prompt-Erzeugung steckt in `interviewSchritt()`, und
+die ruft das Modell. Geprüft sind die Bausteine (`uebersprungeneVon()`,
+`andereHabenUebersprungen()`, die Filterung der offenen Punkte) und der
+Zusammenbau durch Lesen, nicht durch einen Lauf mit echter KI.

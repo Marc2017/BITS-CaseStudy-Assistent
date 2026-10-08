@@ -5,17 +5,21 @@
 // aenderbar.
 import { useState } from 'react';
 import {
-  api, STUFEN, type Fakt, type Fortschritt, type Katalogeintrag, type Stufe,
+  api, STUFEN,
+  type Fakt, type Fortschritt, type Katalogeintrag, type Stufe, type Uebersprungen,
 } from '../lib/api.ts';
 import { Kasten, StufenKnopf } from './teile.tsx';
+import { Beteiligte } from './Mitarbeit.tsx';
 
 export function Fakten(
-  { storyId, fakten, stand, katalog, aktualisieren, fehler }:
+  { storyId, fakten, stand, katalog, beteiligte, uebersprungen, aktualisieren, fehler }:
   {
     storyId: number;
     fakten: Fakt[];
     stand: Fortschritt;
     katalog: Katalogeintrag[];
+    beteiligte: { name: string; fakten: number }[];
+    uebersprungen: Uebersprungen[];
     aktualisieren: (f: Fakt[], s: Fortschritt) => void;
     fehler: (t: string) => void;
   },
@@ -83,6 +87,9 @@ export function Fakten(
                   {f.quelle === 'import' && (
                     <div className="beleg">aus einem bestehenden Text übernommen</div>
                   )}
+                  {f.beigetragen_name && (
+                    <div className="beleg">von {f.beigetragen_name}</div>
+                  )}
                 </div>
                 <div className="werkzeug">
                   {!f.sicher && (
@@ -119,6 +126,11 @@ export function Fakten(
             ))}
           </>
         )}
+      
+        {/* Wer was beigetragen und wer was übersprungen hat (E-23).
+            Hier und nicht in der Kopfzeile: Es gehört zum Bestand,
+            nicht zur Steuerung. */}
+        <Beteiligte wer={beteiligte} uebersprungen={uebersprungen} katalog={katalog} />
       </div>
 
       <div className="werkzeugleiste">

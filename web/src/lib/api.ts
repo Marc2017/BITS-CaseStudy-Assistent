@@ -21,6 +21,9 @@ export interface Fakt {
   beleg: string | null;
   sicher: number;
   erstellt_am: string;
+  /** Wer die Angabe beigetragen hat (E-23) - nur zur Anzeige, nie im Prompt (I-10). */
+  beigetragen_von: string | null;
+  beigetragen_name: string | null;
 }
 
 export interface Nachricht {
@@ -143,6 +146,33 @@ export interface ZielMitFreigabe extends Ziel {
   freigegeben: number;
 }
 
+/** Eine Bitte um Mithilfe (E-23). */
+export interface Anfrage {
+  id: number;
+  story_id: number;
+  an_email: string;
+  an_name: string | null;
+  von_kennung: string;
+  von_name: string;
+  hinweis: string | null;
+  status: 'offen' | 'erledigt' | 'abgelehnt';
+  mail_versandt: string | null;
+  mail_fehler: string | null;
+  erstellt_am: string;
+  beendet_am: string | null;
+  /** Nur in „Für mich angefragt": der Arbeitstitel der Geschichte. */
+  arbeitstitel?: string;
+}
+
+/** Was eine Person nicht beantworten konnte - fuer andere bleibt es offen. */
+export interface Uebersprungen {
+  schluessel: string;
+  person: string;
+  person_name: string | null;
+  grund: string | null;
+  erstellt_am: string;
+}
+
 export interface StoryVoll {
   story: StoryZeile;
   verlauf: Nachricht[];
@@ -153,6 +183,14 @@ export interface StoryVoll {
   katalog: Katalogeintrag[];
   projektarten: Projektart[];
   kunden: Kunde[];
+  anfragen: Anfrage[];
+  uebersprungen: Uebersprungen[];
+  beteiligte: { name: string; fakten: number }[];
+  /** Adressen, die schon einmal hier waren - Vorschlag beim Anfragen. */
+  adressen: { email: string; name: string | null }[];
+  mail_moeglich: boolean;
+  /** Meine Kennung - um „von mir übersprungen" zu erkennen. */
+  ich_kennung: string;
 }
 
 /** Wer arbeitet hier, und was darf er (E-19). */
@@ -175,7 +213,9 @@ export interface Startdaten {
   ziele: Pick<Ziel, 'id' | 'schluessel' | 'name' | 'beschreibung' | 'stufe'>[];
   ki: { zugang: boolean; anbieter: string; modell: string };
   ich: Ich;
-  betrieb: { mehrbenutzer: boolean };
+  betrieb: { mehrbenutzer: boolean; mail: boolean };
+  /** Was andere von mir wollen (E-23). */
+  anfragen: Anfrage[];
 }
 
 export interface Lernnotiz {
@@ -344,6 +384,27 @@ export const api = {
   auswerten: (id: number, zielId?: number | null, fortgang?: Fortgang) =>
     strom<{ angelegt: number; uebersprungen: string | null }>(
       `/storys/${id}/auswerten`, { ziel_id: zielId }, fortgang,
+    ),
+
+  // ---------------------------------------------------------- Mitarbeit
+  anfrageNeu: (
+    id: number,
+    e: { an_email: string; an_name?: string | null; hinweis?: string | null; mail?: boolean },
+  ) => ruf<{
+    anfrage: Anfrage; anfragen: Anfrage[]; link: string; mail_fehler: string | null;
+  }>(`/storys/${id}/anfragen`, 'POST', e),
+
+  anfrageBeenden: (id: number, status: 'erledigt' | 'abgelehnt') =>
+    ruf<{ anfrage: Anfrage; anfragen: Anfrage[] }>(`/anfragen/${id}`, 'PATCH', { status }),
+
+  ueberspringen: (id: number, schluessel: string, grund?: string | null) =>
+    ruf<{ uebersprungen: Uebersprungen[]; fortschritt: Fortschritt }>(
+      `/storys/${id}/ueberspringen`, 'POST', { schluessel, grund },
+    ),
+
+  frageWiederStellen: (id: number, schluessel: string) =>
+    ruf<{ uebersprungen: Uebersprungen[] }>(
+      `/storys/${id}/ueberspringen/${encodeURIComponent(schluessel)}`, 'DELETE',
     ),
 
   verwaltung: () => ruf<Verwaltungsdaten>('/verwaltung'),

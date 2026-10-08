@@ -454,3 +454,90 @@ Zwei Werte haben dabei nicht gereicht und wurden geändert: die Trennlinie
 (1.26:1 → 1.36:1) und der Hinweis auf dem leeren Blatt (2.49:1 → 3.71:1).
 Letzterer ist derselbe, dessen CSS-Regel am Vortag repariert wurde (F-05) —
 die Regel wirkte danach, die Farbe trug trotzdem nicht.
+
+## E-23 — Mehrere Personen an einer Erfolgsgeschichte
+
+*08.10.2026 — auf Wunsch von Marc („jeder kann unterschiedliche Fragen
+beantworten und oder zu gleichen Fragen unterschiedliche Blickwinkel
+liefern")*
+
+Eine Erfolgsgeschichte entsteht selten in einem Kopf. Wer sie anlegt, kennt
+den Rahmen; die Technik weiß ein anderer, die Wirkung beim Kunden ein
+Dritter. Drei Dinge bilden das ab:
+
+**1. Anfragen.** Wer eine Geschichte anlegt, kann Kollegen bitten
+mitzuarbeiten — mehrere gleichzeitig, und ein Gebetener kann selbst
+weiterbitten. Eine Anfrage trägt die Adresse, einen Hinweis in eigenen Worten
+und einen Status.
+
+Die Adresse wird **nicht** gegen bekannte Anmeldungen geprüft. Der häufigste
+Fall ist, jemanden hinzuzuholen, der die Anwendung noch nie geöffnet hat —
+eine Prüfung würde genau das verhindern. Darum läuft die Zuordnung über die
+E-Mail-Adresse und nicht über die Keycloak-Kennung: Die Bitte entsteht,
+bevor es eine Kennung gibt.
+
+**2. Überspringen — und zwar je Person.** Das ist der Kern, und es ist die
+Stelle, an der man das Gegenteil bauen kann. Ein übersprungener Punkt
+verstummt nur für **die Person, die ihn übersprungen hat**. Für alle anderen
+bleibt er offen; genau dafür holt man jemanden dazu. Wer das „je Person"
+weglässt, baut eine Funktion, die den Zweck zerstört: Die Frage wäre für
+immer weg, und der hinzugeholte Kollege würde nie gefragt.
+
+Der Interview-Prompt bekommt daraus drei Angaben: was diese Person
+übersprungen hat (nicht wiederholen — sie hat nicht geschwiegen, sondern
+gesagt, dass sie es nicht weiß), was **andere** übersprungen haben
+(vielleicht weiß diese Person es), und die Anweisung, deutlich zu sagen, wenn
+für diese Person nichts mehr zu holen ist.
+
+Zur Auswahl stehen die offenen Punkte, nicht „die letzte Frage". Eine Frage
+im Gespräch berührt oft mehrere Punkte, und welchen die Person nicht weiß,
+weiß nur sie.
+
+**3. Herkunft.** Jeder Fakt hält fest, von wem er stammt — im Interview wie
+beim Eintragen von Hand. Das macht aus einem Bestand eine Spur: Wer etwas
+nachfragen will, weiß, wen. Daraus folgt unmittelbar **I-10** — diese
+Angaben dürfen in keinen Formulierungs-Prompt gelangen.
+
+**Was es nicht gibt:** einen Schutz gegen widersprechende Angaben zweier
+Personen bei Einzelrubriken. Dort gilt die letzte Angabe. Für zwei
+Blickwinkel auf dieselbe Sache sind Mehrfach-Rubriken der Weg (`mehrfach`
+im Katalog), und die gibt es für die Rubriken, bei denen es darauf ankommt.
+Siehe O-08.
+
+## E-24 — Mailversand ist optional, und optional heißt wirklich optional
+
+*08.10.2026 — auf Marcs Entscheidung („1 und 2 — wenn in den Einstellungen
+ein SMTP-Server eingetragen ist, kann dann mit Checkbox auch eine E-Mail
+versendet werden")*
+
+Ohne Mailserver funktioniert alles: Die Anfrage erscheint beim Gefragten auf
+der Startseite unter „Für mich angefragt", und der Link zur Geschichte steht
+zum Weitergeben da. Ist ein Server eingetragen, kommt ein Haken „Auch eine
+E-Mail schicken" dazu.
+
+**Der Link steht immer da, auch wenn eine Mail rausgeht.** Er ist der Weg,
+der nicht scheitern kann — per Teams geschickt, in einen Termin gelegt,
+vorgelesen. Eine Mail im Spam-Ordner ist unsichtbar; ein Link, den man selbst
+verschickt, nicht.
+
+**Die Anfrage wird zuerst gespeichert, die Mail danach versucht.** Scheitert
+der Versand, bleibt die Bitte bestehen und der Grund steht an ihr. Der
+umgekehrte Weg verliert bei jedem Netzproblem eine Bitte, ohne dass es
+jemand merkt.
+
+**Die Mail enthält Arbeitstitel und Hinweis — keinen Inhalt.** Sie verlässt
+die Anwendung und landet in einem Postfach, das wir nicht kennen; Fakten
+können intern oder vertraulich sein (I-04). Wer mitarbeiten soll, klickt den
+Link und ist dann angemeldet.
+
+**Das SMTP-Passwort fällt unter I-08**: im Mehrbenutzerbetrieb nur aus der
+Umgebung. In der Datei wäre es für jeden lesbar, der an die Datei kommt, und
+über die Oberfläche könnte jeder Angemeldete den Absender unseres Hauses
+übernehmen. Host, Port und Absenderadresse sind keine Geheimnisse und bleiben
+editierbar. Gemessen: `aenderbar('mail.passwort')` ist im
+Mehrbenutzerbetrieb `false`, `aenderbar('mail.host')` ist `true`.
+
+`nodemailer` als Abhängigkeit, gegen die Linie „keine Bibliothek, wo drei
+Aufrufe genügen" (E-19). Bei SMTP genügen sie nicht: STARTTLS, AUTH,
+Zeilenlängen, Punkt-Stuffing und MIME-Kodierung für Umlaute sind mehr
+Fallen, als ein selbstgebauter Client wert ist.

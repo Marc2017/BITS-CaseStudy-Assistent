@@ -129,3 +129,27 @@ der Workflow schlägt mit „No runner matching the specified labels" fehl.
 Entweder umziehen (Settings → Transfer ownership) oder Florian gibt die
 Runner für dieses Repository frei. Das Umziehen ist ohnehin das Richtige: Ein
 Werkzeug für alle Kollegen gehört nicht in einen privaten Account.
+
+### O-08 — Zwei Personen, eine Einzelrubrik, zwei Angaben
+
+Bei einer Rubrik ohne `mehrfach` gilt die **letzte** Angabe; die vorherige
+ist weg, und nur `beigetragen_von` wechselt mit. Wenn Anna „Die Disposition
+lief über Excel" schreibt und Bert es anders sieht, überschreibt er sie
+stillschweigend.
+
+Für den Zweck, den Marc beschrieben hat — verschiedene Leute beantworten
+verschiedene Fragen —, trägt das. Für „zwei Blickwinkel auf dieselbe Frage"
+sind Mehrfach-Rubriken der Weg, und die gibt es dort, wo es darauf ankommt
+(Herausforderung, Schritt, Technologie, Rolle, Wirkung, Kennzahl).
+
+Was fehlen würde, wenn es doch weh tut: eine Historie je Fakt (wer wann was)
+und eine sichtbare Markierung „hier gibt es zwei Meinungen". Beides ist eine
+eigene Entscheidung, keine Zeile — deshalb hier und nicht im Code.
+
+### O-09 — Wie erfährt jemand von einer Anfrage, der die Anwendung nicht offen hat?
+
+Heute: über die Mail (wenn ein Server eingetragen ist) oder weil ihm jemand
+den Link schickt. Ohne beides sieht er die Bitte erst beim nächsten Besuch.
+
+Ein Teams-Webhook wäre der naheliegende dritte Weg — BITS arbeitet in Teams,
+nicht in der Mail. Das ist nicht gebaut und auch nicht entschieden.
